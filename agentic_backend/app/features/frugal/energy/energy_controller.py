@@ -20,7 +20,7 @@ from datetime import datetime
 
 from fastapi import Depends, HTTPException, Query, APIRouter
 
-from fred_core import KeycloakUser, get_current_user
+from fred_core import User, get_current_user
 from app.features.frugal.cluster_consumption.cluster_consumption_abstract_service import AbstractClusterConsumptionService
 from app.features.frugal.cluster_consumption.cluster_consumption_service import ClusterConsumptionService
 from app.features.frugal.cluster_consumption.cluster_consumption_structures import ClusterConsumptionSeries
@@ -43,7 +43,7 @@ class EnergyController:
         async def get_energy_consumption(start: datetime, end: datetime,
                                          cluster: str,
                                          precision: PrecisionEnum = PrecisionEnum.NONE,
-                                         user: KeycloakUser = Depends(get_current_user)
+                                         user: User = Depends(get_current_user)
                                          ) -> ClusterConsumptionSeries:
             try:
                 return service.consumption_wh(start, end, cluster, precision)
@@ -58,7 +58,7 @@ class EnergyController:
                  )
         async def get_energy_mix(start: datetime, end: datetime,
                                  precision: PrecisionEnum = PrecisionEnum.D,
-                                 user: KeycloakUser = Depends(get_current_user)
+                                 user: User = Depends(get_current_user)
                                  ) -> ClusterConsumptionSeries:
             try:
                 return service.consumption_mix(start, end, precision)
@@ -77,7 +77,7 @@ class EnergyController:
                 start_window_2: datetime = Query(..., description="Start datetime of the second window"),
                 end_window_2: datetime = Query(..., description="End datetime of the second window"),
                 cluster: str = Query(..., description="The measured cluster"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> CompareResult:
             try:
                 return service.consumption_wh_compare(start_window_1, end_window_1, start_window_2, end_window_2,

@@ -15,7 +15,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 from app.features.tag.structure import Tag
-from fred_core import KeycloakUser
+from fred_core import User
 
 
 class TagNotFoundError(Exception):
@@ -43,7 +43,7 @@ class BaseTagStore(ABC):
     """
 
     @abstractmethod
-    def list_tags_for_user(self, user: KeycloakUser) -> List[Tag]:
+    def list_tags_for_user(self, user: User) -> List[Tag]:
         pass
 
     @abstractmethod

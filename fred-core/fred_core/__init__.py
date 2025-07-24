@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from fred_core.security.keycloak import get_current_user, initialize_keycloak
 from fred_core.security.structure import (
-    KeycloakUser,
+    User,
     Security,
     ConfigurationWithSecurity,
 )
@@ -28,7 +27,7 @@ from fred_core.store.local_json_store import (
 __all__ = [
     "get_current_user",
     "initialize_keycloak",
-    "KeycloakUser",
+    "User",
     "Security",
     "ConfigurationWithSecurity",
     "LocalJsonStore",

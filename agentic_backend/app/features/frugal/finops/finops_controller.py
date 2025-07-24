@@ -20,7 +20,7 @@ from datetime import datetime
 
 from fastapi import Depends, HTTPException, Query, APIRouter
 
-from fred_core import KeycloakUser, get_current_user
+from fred_core import User, get_current_user
 from app.features.frugal.cluster_consumption.cluster_consumption_abstract_service import AbstractClusterConsumptionService
 from app.features.frugal.cluster_consumption.cluster_consumption_service import ClusterConsumptionService
 from app.common.structures import PrecisionEnum, Series, CompareResult, Configuration
@@ -41,7 +41,7 @@ class FinopsController:
         async def get_cloud_cost_route(start: datetime, end: datetime,
                                        cluster: str,
                                        precision: PrecisionEnum = PrecisionEnum.NONE,
-                                       user: KeycloakUser = Depends(get_current_user)) -> Series:
+                                       user: User = Depends(get_current_user)) -> Series:
             try:
                 return service.consumption_finops(start, end, cluster, precision)
             except Exception as e:
@@ -59,7 +59,7 @@ class FinopsController:
                 start_window_2: datetime = Query(..., description="Start datetime of the second window"),
                 end_window_2: datetime = Query(..., description="End datetime of the second window"),
                 cluster: str = Query(..., description="cluster of the cost billing"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> CompareResult:
             try:
                 return service.consumption_finops_compare(start_window_1, end_window_1,

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Protocol
+from typing import List, Protocol
 from pydantic import BaseModel
 
 class KeycloakUser(BaseModel):
@@ -33,3 +33,10 @@ class Security(BaseModel):
 
 class ConfigurationWithSecurity(Protocol):
     security: Security
+
+
+class User(BaseModel):
+        uid: str
+        username: str
+        roles: List[str]
+        email:str

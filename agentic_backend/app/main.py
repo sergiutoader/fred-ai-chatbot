@@ -46,7 +46,7 @@ from app.features.k8.kube_controller import KubeController
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fred_core import initialize_keycloak
+from fred_core.security.security import initialize_security
 from rich.logging import RichHandler
 
 
@@ -90,7 +90,7 @@ def create_app() -> FastAPI:
     
     ApplicationContext(configuration)
     
-    initialize_keycloak(configuration)
+    initialize_security(configuration)
     create_tool_metric_store(configuration.tool_metrics_storage)
     create_node_metric_store(configuration.node_metrics_storage)
 

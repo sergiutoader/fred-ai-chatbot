@@ -33,7 +33,7 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from app.application_context import get_app_context, get_configuration
 
-from fred_core import KeycloakUser, get_current_user
+from fred_core import User, get_current_user
 from app.features.frugal.ai_service import AIService, WorkloadKind
 from app.common.connectors.file_dao import FileDAO
 
@@ -76,7 +76,7 @@ class UiController:
                 logger.error(f"Failed to delete file {file_path}: {e}")
 
         @app.get("/export", tags=fastapi_tags, summary="Export a dump of the data")
-        async def export_data(background_tasks: BackgroundTasks, user: KeycloakUser = Depends(get_current_user)):
+        async def export_data(background_tasks: BackgroundTasks, user: User = Depends(get_current_user)):
             """
             Export the data as a zip file.
 
@@ -168,7 +168,7 @@ class UiController:
         )
         async def get_clusters_footprints(
             start: datetime, end: datetime, precision: PrecisionEnum = PrecisionEnum.D,
-            user: KeycloakUser = Depends(get_current_user)
+            user: User = Depends(get_current_user)
         ) -> list[ClusterFootprint]:
             logger.info(f"User {user.username} with roles {user.roles} is fetching cluster footprints")
 
@@ -265,7 +265,7 @@ class UiController:
         )
         async def get_cluster_scores(
             cluster_name: str = Query(..., description="The identifier of the cluster"),
-            user: KeycloakUser = Depends(get_current_user)
+            user: User = Depends(get_current_user)
         ) -> ClusterScore:
             known_clusters: ClusterList = self.kube_service.get_clusters_list()
             target_cluster = next(
@@ -327,7 +327,7 @@ class UiController:
         )
         async def get_cluster_details(
             cluster_name: str = Query(..., description="The identifier of the cluster"),
-            user: KeycloakUser = Depends(get_current_user)
+            user: User = Depends(get_current_user)
         ) -> ClusterDescription:
             known_clusters: ClusterList = self.kube_service.get_clusters_list()
             target_cluster = next(

@@ -15,7 +15,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from app.common.connectors.database import get_db
-from fred_core import KeycloakUser, get_current_user
+from fred_core import User, get_current_user
 from sqlalchemy.orm import Session
 from datetime import datetime
 from sqlalchemy.ext.declarative import declarative_base
@@ -52,7 +52,7 @@ from datetime import datetime
 # @router.post("/fred/feedback", tags=["Feedback"], summary="Submit user feedback")
 # async def post_feedback(
 #     feedback: FeedbackPayload,
-#     user: KeycloakUser = Depends(get_current_user),
+#     user: User = Depends(get_current_user),
 #     db: Session = Depends(get_db)
 # ):
 #     logger.info(f"Feedback received from {user.username}: {feedback}")

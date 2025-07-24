@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
 from kubernetes.client.exceptions import ApiException
 
-from fred_core import KeycloakUser, get_current_user
+from fred_core import User, get_current_user
 from app.features.k8.kube_service import KubeService
 from app.features.k8.structure import Cluster, Workload, WorkloadKind, WorkloadNameList, IngressesList
 from app.features.k8.structure import NamespacesList, Namespace, ConfigMapsList, ServicesList
@@ -63,7 +63,7 @@ class KubeController:
             summary="Get the list of Clusters",
         )
         async def get_clusters_list(
-            user: KeycloakUser = Depends(get_current_user)
+            user: User = Depends(get_current_user)
         ) -> list[Cluster]:
             """
             Retrieve the list of Kubernetes Clusters.
@@ -94,7 +94,7 @@ class KubeController:
             tags=fastapi_tags,
             summary="Get the list of Namespaces for the given Cluster.",
         )
-        async def get_namespaces_list(cluster_name: str, user: KeycloakUser = Depends(get_current_user)) -> NamespacesList:
+        async def get_namespaces_list(cluster_name: str, user: User = Depends(get_current_user)) -> NamespacesList:
             """
             Retrieve the list of Namespaces for a specific Cluster.
 
@@ -139,7 +139,7 @@ class KubeController:
             ),
         )
         async def get_namespace_description(
-                cluster_name: str, namespace: str, user: KeycloakUser = Depends(get_current_user)
+                cluster_name: str, namespace: str, user: User = Depends(get_current_user)
         ) -> Namespace:
             """
             Describe a specific Namespace in a Cluster.
@@ -186,7 +186,7 @@ class KubeController:
         )
         async def get_workload_names_list(cluster_name: str, namespace: str,
                                           kind: WorkloadKind,
-                                          user: KeycloakUser = Depends(get_current_user)
+                                          user: User = Depends(get_current_user)
                                           ) -> WorkloadNameList:
             try:
                 return kube_service.get_workload_names_list(cluster_name, namespace, kind)
@@ -209,7 +209,7 @@ class KubeController:
         )
         async def get_workload_description(cluster_name: str, namespace: str, workload_name: str,
                                            kind: WorkloadKind,
-                                           user: KeycloakUser = Depends(get_current_user)
+                                           user: User = Depends(get_current_user)
                                            ) -> Workload:
             try:
                 return kube_service.get_workload_description(cluster_name, namespace, workload_name, kind)
@@ -232,7 +232,7 @@ class KubeController:
         )
         async def get_workload_configmaps(cluster_name: str, namespace: str, workload_name: str,
                                           kind: WorkloadKind,
-                                            user: KeycloakUser = Depends(get_current_user)
+                                            user: User = Depends(get_current_user)
                                           ) -> ConfigMapsList:
             try:
                 return kube_service.get_workload_configmaps(cluster_name, namespace, workload_name, kind)
@@ -256,7 +256,7 @@ class KubeController:
             summary="Get the list of Services the given workload in the given namespace for the specified cluster",
         )
         async def get_workload_services(cluster_name: str, namespace: str, workload_name: str, kind: WorkloadKind,
-                                          user: KeycloakUser = Depends(get_current_user)) \
+                                          user: User = Depends(get_current_user)) \
                 -> ServicesList:
             try:
                 return kube_service.get_workload_services(cluster_name, namespace, workload_name, kind)
@@ -280,7 +280,7 @@ class KubeController:
             summary="Get the list of Ingresses the given workload in the given namespace for the specified cluster",
         )
         async def get_workload_ingresses(cluster_name: str, namespace: str, workload_name: str, kind: WorkloadKind,
-                                          user: KeycloakUser = Depends(get_current_user)) \
+                                          user: User = Depends(get_current_user)) \
                 -> IngressesList:
             try:
                 return kube_service.get_workload_ingresses(cluster_name, namespace, workload_name, kind)

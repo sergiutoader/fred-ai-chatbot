@@ -18,7 +18,7 @@ from uuid import uuid4
 from app.application_context import ApplicationContext
 from app.features.metadata.service import MetadataService
 from app.features.tag.structure import Tag, TagCreate, TagUpdate
-from fred_core import KeycloakUser
+from fred_core import User
 
 
 class TagService:
@@ -32,15 +32,15 @@ class TagService:
 
         self.document_metadata_service = MetadataService()
 
-    def list_tags_for_user(self, user: KeycloakUser) -> list[Tag]:
+    def list_tags_for_user(self, user: User) -> list[Tag]:
         # Todo: check if user is authorized
         return self._tag_store.list_tags_for_user(user)
 
-    def get_tag_for_user(self, tag_id: str, user: KeycloakUser) -> Tag:
+    def get_tag_for_user(self, tag_id: str, user: User) -> Tag:
         # Todo: check if user is authorized
         return self._tag_store.get_tag_by_id(tag_id)
 
-    def create_tag_for_user(self, tag_data: TagCreate, user: KeycloakUser) -> Tag:
+    def create_tag_for_user(self, tag_data: TagCreate, user: User) -> Tag:
         # Todo: check if user is authorized to create tags
 
         # Check that document ids are valid
@@ -64,7 +64,7 @@ class TagService:
 
         return self._tag_store.create_tag(tag)
 
-    def update_tag_for_user(self, tag_id: str, tag_data: TagUpdate, user: KeycloakUser) -> Tag:
+    def update_tag_for_user(self, tag_id: str, tag_data: TagUpdate, user: User) -> Tag:
         # Todo: check if user is authorized
 
         # Check that document ids are valid
@@ -83,7 +83,7 @@ class TagService:
 
         return self._tag_store.update_tag_by_id(tag_id, tag)
 
-    def delete_tag_for_user(self, tag_id: str, user: KeycloakUser) -> None:
+    def delete_tag_for_user(self, tag_id: str, user: User) -> None:
         # Todo: check if user is authorized
         return self._tag_store.delete_tag_by_id(tag_id)
 

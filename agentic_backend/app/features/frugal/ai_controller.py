@@ -33,7 +33,7 @@ from fastapi import (APIRouter, Body, Depends, FastAPI, File, HTTPException, Que
                      UploadFile)
 
 from app.common.utils import log_exception
-from fred_core import KeycloakUser, get_current_user
+from fred_core import User, get_current_user
 from app.features.frugal.ai_service import AIService
 from app.features.k8.structure import WorkloadKind
 
@@ -244,7 +244,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
         )
         async def get_cluster_facts(
                 cluster_name: str = Query(..., description="The Cluster name"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> Facts:
             """
             Get the Cluster Facts.
@@ -279,7 +279,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
             summary="Get the Cluster Summary",
         )
         async def get_cluster_summary(cluster_name: str = Query(..., description="The Cluster name"),
-                                      user: KeycloakUser = Depends(get_current_user)
+                                      user: User = Depends(get_current_user)
                                       ) \
                 -> ClusterSummary:
             """
@@ -343,7 +343,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
         )
         async def get_cluster_topology(
                 cluster_name: str = Query(..., description="The Cluster name"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> ClusterTopology:
             """
             Get the Cluster Topology.
@@ -450,7 +450,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
         async def get_namespace_facts(
                 cluster_name: str = Query(..., description="The Cluster name"),
                 namespace: str = Query(..., description="The Namespace"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> Facts:
             """
             Get the Namespace Facts.
@@ -488,7 +488,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
         async def get_namespace_summary(
                 cluster_name: str = Query(..., description="The Cluster name"),
                 namespace: str = Query(..., description="The Namespace"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> NamespaceSummary:
             """
             Get the Namespace Summary.
@@ -560,7 +560,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
         async def get_namespace_topology(
                 cluster_name: str = Query(..., description="The Cluster name"),
                 namespace: str = Query(..., description="The Namespace"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> NamespaceTopology:
             """
             Get the Namespace Topology.
@@ -600,7 +600,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
                 namespace: str = Query(..., description="The Namespace"),
                 workload_name: str = Query(..., description="The Workload name"),
                 kind: WorkloadKind = Query(..., description="The Workload kind"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> WorkloadId:
             """
             Get the Workload id (Commercial Off-The-Shelf software name).
@@ -690,7 +690,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
                 namespace: str = Query(..., description="The Namespace"),
                 workload_name: str = Query(..., description="The Workload name"),
                 kind: WorkloadKind = Query(..., description="The Workload kind"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> WorkloadEssentials:
             """
             Get the Workload Essentials.
@@ -780,7 +780,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
                 namespace: str = Query(..., description="The Namespace"),
                 workload_name: str = Query(..., description="The Workload name"),
                 kind: WorkloadKind = Query(..., description="The Workload kind"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> WorkloadSummary:
             """
             Get the Workload Summary.
@@ -870,7 +870,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
                 namespace: str = Query(..., description="The Namespace"),
                 workload_name: str = Query(..., description="The Workload name"),
                 kind: WorkloadKind = Query(..., description="The Workload kind"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> WorkloadAdvanced:
             """
             Get the Workload Advanced.
@@ -960,7 +960,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
                 namespace: str = Query(..., description="The Namespace"),
                 workload_name: str = Query(..., description="The Workload name"),
                 kind: WorkloadKind = Query(..., description="The Workload kind"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> WorkloadScores:
             """
             Get the Workload Scores.
@@ -1140,7 +1140,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
                 namespace: str = Query(..., description="The Namespace"),
                 workload_name: str = Query(..., description="The Workload name"),
                 kind: WorkloadKind = Query(..., description="The Workload kind"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> Facts:
             """
             Get the Workload Facts.
@@ -1187,7 +1187,7 @@ class AIController:  # pylint: disable=R0914, R0915, R0903
                 namespace: str = Query(..., description="The Namespace"),
                 workload_name: str = Query(..., description="The Workload name"),
                 kind: WorkloadKind = Query(..., description="The Workload kind"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> WorkloadTopology:
             """
             Get the Workload Topology.

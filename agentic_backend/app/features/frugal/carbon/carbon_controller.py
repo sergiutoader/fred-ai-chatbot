@@ -35,7 +35,7 @@ from datetime import datetime
 from app.features.frugal.cluster_consumption.cluster_consumption_structures import ClusterConsumptionSeries
 from fastapi import Depends, HTTPException, Query, APIRouter
 
-from fred_core import KeycloakUser, get_current_user
+from fred_core import User, get_current_user
 from app.features.frugal.cluster_consumption.cluster_consumption_abstract_service import AbstractClusterConsumptionService
 from app.features.frugal.cluster_consumption.cluster_consumption_service import ClusterConsumptionService
 from app.common.structures import CompareResult
@@ -57,7 +57,7 @@ class CarbonController:
         async def get_carbon_consumption(start: datetime, end: datetime,
                                          cluster: str,
                                          precision: PrecisionEnum = PrecisionEnum.NONE,
-                                         user: KeycloakUser = Depends(get_current_user)
+                                         user: User = Depends(get_current_user)
                                          ) -> ClusterConsumptionSeries:
             try:
                 return service.consumption_gco2(start, end, cluster, precision)
@@ -76,7 +76,7 @@ class CarbonController:
                 start_window_2: datetime = Query(..., description="Start datetime of the second window"),
                 end_window_2: datetime = Query(..., description="End datetime of the second window"),
                 cluster: str = Query(..., description="The measured cluster"),
-                user: KeycloakUser = Depends(get_current_user)
+                user: User = Depends(get_current_user)
         ) -> CompareResult:
             try:
                 return service.consumption_gco2_compare(start_window_1, end_window_1, start_window_2, end_window_2,

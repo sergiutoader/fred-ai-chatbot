@@ -35,7 +35,7 @@ from fastapi import (
 )
 
 from fastapi.responses import JSONResponse, StreamingResponse
-from fred_core import KeycloakUser, get_current_user
+from fred_core import User, get_current_user
 from starlette.websockets import WebSocketState
 
 from app.chatbot.structures.agentic_flow import AgenticFlow
@@ -80,7 +80,7 @@ class ChatbotController:
             summary="Get the list of available agentic flows",
             tags=fastapi_tags,
         )
-        def get_agentic_flows(user: KeycloakUser = Depends(get_current_user)) -> list[AgenticFlow]:
+        def get_agentic_flows(user: User = Depends(get_current_user)) -> list[AgenticFlow]:
             static_flows = self.agent_manager.get_agentic_flows()
             dynamic_flows = self.dynamic_agent_manager.get_agentic_flows()
             return static_flows + dynamic_flows
@@ -97,7 +97,7 @@ class ChatbotController:
                   response_model=FinalEvent)
         async def chatbot_query(
             event: ChatAskInput = Body(...),
-            user: KeycloakUser = Depends(get_current_user)
+            user: User = Depends(get_current_user)
         ):
             try:
                 streamed_messages = []
@@ -133,7 +133,7 @@ class ChatbotController:
         @app.post("/chatbot/query/stream", tags=fastapi_tags, response_class=StreamingResponse)
         async def chatbot_query_stream(
             event: ChatAskInput = Body(...),
-            user: KeycloakUser = Depends(get_current_user)
+            user: User = Depends(get_current_user)
         ):
 
             async def event_stream():
@@ -240,7 +240,7 @@ class ChatbotController:
             description="Get the list of active chatbot sessions.",
             summary="Get the list of active chatbot sessions.",
         )
-        def get_sessions(user: KeycloakUser = Depends(get_current_user)) -> list[SessionWithFiles]:
+        def get_sessions(user: User = Depends(get_current_user)) -> list[SessionWithFiles]:
             return self.session_manager.get_sessions(user.uid)
 
         @app.get(
@@ -250,7 +250,7 @@ class ChatbotController:
             tags=fastapi_tags,
             response_model=List[ChatMessagePayload]
         )
-        def get_session_history(session_id: str, user: KeycloakUser = Depends(get_current_user)) -> list[ChatMessagePayload]:
+        def get_session_history(session_id: str, user: User = Depends(get_current_user)) -> list[ChatMessagePayload]:
             return self.session_manager.get_session_history(session_id, user.uid)
 
         @app.delete(
@@ -259,7 +259,7 @@ class ChatbotController:
             summary="Delete a chatbot session.",
             tags=fastapi_tags,
         )
-        def delete_session(session_id: str, user: KeycloakUser = Depends(get_current_user)) -> bool:
+        def delete_session(session_id: str, user: User = Depends(get_current_user)) -> bool:
             return self.session_manager.delete_session(session_id, user.uid)
 
 
