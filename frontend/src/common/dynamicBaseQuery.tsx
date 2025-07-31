@@ -16,8 +16,7 @@
 
 import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { getConfig } from "./config";
-import { KeyCloakService } from "../security/KeycloakService";
-
+import { getAuthService } from "../security";
 /**
  * Options to select which backend to use for the baseQuery.
  */
@@ -33,8 +32,10 @@ interface DynamicBaseQueryOptions {
  * @returns a baseQuery function ready for RTK Query
  */
 export const createDynamicBaseQuery = (options: DynamicBaseQueryOptions) => {
+    
   return async (args, api, extraOptions) => {
     // ❗❗ Only access the config when the request is actually made
+    const authService = await getAuthService();    
     const baseUrl =
       options.backend === "knowledge"
         ? import.meta.env.VITE_BACKEND_URL_KNOWLEDGE || getConfig().backend_url_knowledge
@@ -47,7 +48,7 @@ export const createDynamicBaseQuery = (options: DynamicBaseQueryOptions) => {
     const rawBaseQuery = fetchBaseQuery({
       baseUrl,
       prepareHeaders: (headers) => {
-        const token = KeyCloakService.GetToken();
+        const token = authService.GetToken();
         if (token) {
           headers.set("Authorization", `Bearer ${token}`);
         }

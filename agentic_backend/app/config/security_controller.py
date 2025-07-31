@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# fred_core/security/__init__.py
+from fastapi import APIRouter
+from app.application_context import get_app_context
+from fred_core.security.structure import Security
 
-from .security import (
-    initialize_security,
-    get_current_user,
-)
+class SecurityController:
+    def __init__(self, router: APIRouter):
+        self.router = router
+        self.register_routes()
 
-__all__ = [
-    "initialize_security",
-    "get_current_user",
-]
+    def register_routes(self):
+        @self.router.get("/config/security", response_model=Security, tags=["Configuration"])
+        def get_security_config():
+            return get_app_context().configuration.security

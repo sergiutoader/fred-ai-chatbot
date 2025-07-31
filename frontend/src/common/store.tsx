@@ -18,6 +18,7 @@ import { chatApiSlice } from "../slices/chatApi";
 import { documentApiSlice } from "../slices/documentApi.tsx";
 import { monitoringApiMiddleware, monitoringApiReducer } from "../slices/monitoringApi.tsx";
 import { knowledgeContextApiSlice } from "../slices/knowledgeContextApi.tsx";
+import { securityApiSlice } from "../slices/securityApiSlice.tsx";
 
 // Optional: Logging middleware for debugging
 const loggingMiddleware = () => (next) => (action) => {
@@ -47,7 +48,8 @@ const combinedReducer = combineReducers({
   documentApi: documentApiSlice.reducer,
   chatApi: chatApiSlice.reducer,
   monitoringApi: monitoringApiReducer,
-  knowledgeContextApi: knowledgeContextApiSlice.reducer
+  knowledgeContextApi: knowledgeContextApiSlice.reducer,
+  securityApi: securityApiSlice.reducer
 });
 
 // Configure store
@@ -60,7 +62,8 @@ export const store = configureStore({
       chatApiSlice.middleware,
       monitoringApiMiddleware,
       loggingMiddleware,
-      knowledgeContextApiSlice.middleware
+      knowledgeContextApiSlice.middleware,
+      securityApiSlice.middleware
     ),
   devTools: true,
 });

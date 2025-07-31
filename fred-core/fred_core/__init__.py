@@ -23,10 +23,14 @@ from fred_core.store.local_json_store import (
     ResourceNotFoundError,
     ResourceAlreadyExistsError,
 )
+from fred_core.security.security import (
+    get_current_user,
+    initialize_security,
+)
 
 __all__ = [
     "get_current_user",
-    "initialize_keycloak",
+    "initialize_security",
     "User",
     "Security",
     "ConfigurationWithSecurity",

@@ -43,7 +43,7 @@ import UploadIcon from "@mui/icons-material/Upload";
 import SaveIcon from "@mui/icons-material/Save";
 import SearchIcon from "@mui/icons-material/Search";
 import LibraryBooksRoundedIcon from "@mui/icons-material/LibraryBooksRounded";
-import { KeyCloakService } from "../security/KeycloakService";
+import { getAuthService } from "../security";
 import {
   DOCUMENT_PROCESSING_STAGES,
   KnowledgeDocument,
@@ -116,10 +116,10 @@ import { useTranslation } from "react-i18next";
  * - Drawer and transitions are animated for smooth UX
  * - Responsive layout using MUI's Grid2 and Breakpoints
  */
-export const DocumentLibrary = () => {
+export const DocumentLibrary = async () => {
   const { showInfo, showError } = useToast();
   const [uploadMode, setUploadMode] = useState<"upload" | "process">("process");
-
+  const authService = await getAuthService(); 
   // API Hooks
   const [deleteDocument] = useDeleteDocumentMutation();
   const [browseDocuments] = useBrowseDocumentsMutation();
@@ -140,7 +140,7 @@ export const DocumentLibrary = () => {
   const { t } = useTranslation();
 
   const hasDocumentManagementPermission = () => {
-    const userRoles = KeyCloakService.GetUserRoles();
+    const userRoles = authService.GetUserRoles();
     return userRoles.includes("admin") || userRoles.includes("editor");
   };
 
@@ -180,9 +180,9 @@ export const DocumentLibrary = () => {
   //
   // This allows the UI to adjust behavior (e.g., show/hide upload button) based on user permissions.
   const [userInfo, setUserInfo] = useState({
-    name: KeyCloakService.GetUserName(),
+    name: authService.GetUserName(),
     canManageDocuments: hasDocumentManagementPermission(),
-    roles: KeyCloakService.GetUserRoles(),
+    roles: authService.GetUserRoles(),
   });
 
   const { getInputProps, open } = useDropzone({
@@ -247,9 +247,9 @@ export const DocumentLibrary = () => {
   useEffect(() => {
     setShowElements(true);
     setUserInfo({
-      name: KeyCloakService.GetUserName(),
+      name: authService.GetUserName(),
       canManageDocuments: hasDocumentManagementPermission(),
-      roles: KeyCloakService.GetUserRoles(),
+      roles: authService.GetUserRoles(),
     });
   }, []);
 

@@ -24,10 +24,10 @@ import { MessagesArea } from "./MessagesArea.tsx";
 import { getAgentBadge } from "../../utils/avatar.tsx";
 import { getConfig } from "../../common/config.tsx";
 import { useGetChatBotMessagesMutation } from "../../slices/chatApi.tsx";
-import { KeyCloakService } from "../../security/KeycloakService.ts";
 import { StreamEvent, ChatMessagePayload, SessionSchema, FinalEvent } from "../../slices/chatApiStructures.ts";
 import { KnowledgeContext } from "../knowledgeContext/KnowledgeContextEditDialog.tsx";
 import { useTranslation } from "react-i18next";
+import { getAuthService } from "../../security/index.tsx";
 
 export interface ChatBotError {
   session_id: string | null;
@@ -47,7 +47,7 @@ interface TranscriptionResponse {
   text?: string; // 'text' might be optional
 }
 
-const ChatBot = ({
+const ChatBot = async ({
   currentChatBotSession,
   currentAgenticFlow,
   agenticFlows,
@@ -66,7 +66,7 @@ const ChatBot = ({
 }) => {
   const theme = useTheme();
   const { t } = useTranslation();
-
+  const authService = await getAuthService(); 
   const { showInfo, showError } = useToast();
   const webSocketRef = useRef<WebSocket | null>(null);
   const [getChatBotMessages] = useGetChatBotMessagesMutation();
@@ -248,7 +248,7 @@ const ChatBot = ({
   // Catch the user input
   const handleSend = async (content: UserInputContent) => {
     // Currently the logic is to send the first non-null content in the order of text, audio and file
-    const userId = KeyCloakService.GetUserId();
+    const userId = authService.GetUserId();
     const sessionId = currentChatBotSession?.id;
     const agentName = currentAgenticFlow.name;
     if (content.files && content.files.length > 0) {
@@ -372,7 +372,7 @@ const ChatBot = ({
 
     console.log("[📤 ChatBot] About to send, session_id =", currentChatBotSession?.id);
     const event: ChatBotEventSend & { chat_profile_id?: string } = {
-      user_id: KeyCloakService.GetUserId(),
+      user_id: authService.GetUserId(),
       message: input,
       agent_name: agent ? agent.name : currentAgenticFlow.name,
       session_id: currentChatBotSession?.id,

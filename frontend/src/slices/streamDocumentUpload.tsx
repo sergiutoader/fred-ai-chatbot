@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { getConfig } from "../common/config";
-import { KeyCloakService } from "../security/KeycloakService";
+import { getAuthService } from "../security";
 import { ProcessingProgress } from "../types/ProcessingProgress";
 
 export async function streamUploadOrProcessDocument(
@@ -21,7 +21,8 @@ export async function streamUploadOrProcessDocument(
   mode: "upload" | "process",
   onProgress: (update: ProcessingProgress) => void,
 ): Promise<void> {
-  const token = KeyCloakService.GetToken();
+  const authService = await getAuthService();
+  const token = authService.GetToken();
   const formData = new FormData();
   formData.append("files", file);
   const metadata = { tags: ["test"] };// Can extend later if needed

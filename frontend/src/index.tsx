@@ -18,7 +18,6 @@ import "./index.scss";
 import { createRoot } from "react-dom/client";
 import FredUi from "./app/App.tsx";
 import { store } from "./common/store.tsx";
-import { KeyCloakService } from "./security/KeycloakService.ts";
 import { loadConfig } from "./common/config.tsx";
 import './i18n';
 import "@fontsource/inter/100.css";
@@ -27,13 +26,16 @@ import "@fontsource/inter/300.css";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
+import { getAuthService } from "./security";
+
 
 const startApp = async () => {
   console.info("Starting Fred UI...");
   try {
+    const authService = await getAuthService(); 
     await loadConfig(); // <-- await config loading FIRST
     console.info("Configuration loaded successfully");
-    KeyCloakService.CallLogin(() => {
+    authService.CallLogin(() => {
       createRoot(document.getElementById("root") as HTMLElement).render(
         <Provider store={store}>
           <FredUi />

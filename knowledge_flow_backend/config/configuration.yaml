@@ -156,6 +156,9 @@ tag_storage:
   type: "local"
 
 vector_storage:
+  opensearch:
+    host: "http://localhost:9200"
+    metadata_index: "metadata-index"
   # Available backends:
   # - in_memory  → ephemeral, dev-only (no persistence)
   # - opensearch → persistent, secure, production-ready
@@ -163,7 +166,7 @@ vector_storage:
   #
   # ⚠️ in_memory is used by default to ensure startup always succeeds, but it does NOT persist vectors between restarts.
   # Use it only for testing or development.
-  type: opensearch
+  type: in_memory
   # --- Example: SearchEngine configuration
   #
   # type: opensearch

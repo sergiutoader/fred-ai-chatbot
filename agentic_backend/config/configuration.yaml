@@ -193,10 +193,17 @@ dao:
 # Security. As of today only keycloak is supported.
 security:
   enabled: false
+  idp: keycloak
   client_id: "fred"
-  keycloak_url: "http://keycloak:8080/realms/app"
+  issuer: http://keycloak:8080/realms/app
+  jwks_url: http://keycloak:8080/realms/app/protocol/openid-connect/certs
   authorized_origins:
-  - "http://localhost:5173"
+    - "http://localhost:5173"
+  claims_mapping:
+    sub: sub
+    preferred_username: preferred_username
+    email: email
+    roles: resource_access.fred.roles
 
 # Agentic metrics are stored in a prometheus or opensearch backend. To make development
 # easy by default they are stored on a local file.

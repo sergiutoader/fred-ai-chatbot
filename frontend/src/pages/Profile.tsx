@@ -28,7 +28,6 @@ import {
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import KeyIcon from "@mui/icons-material/VpnKey";
 import ChatIcon from "@mui/icons-material/Chat";
-import { KeyCloakService } from "../security/KeycloakService";
 import { ProfileCard } from "../components/profile/ProfileCard";
 import { ProfileToken } from "../components/profile/ProfileToken";
 import { ChatProfiles } from "../components/profile/ChatProfile";
@@ -36,22 +35,23 @@ import { TopBar } from "../common/TopBar";
 import { useSearchParams } from "react-router-dom";
 import InvisibleLink from "../components/InvisibleLink";
 import { useTranslation } from "react-i18next";
+import { getAuthService } from "../security";
 
 function getFallbackTab(): number {
   const savedTab = localStorage.getItem("last_profile_active_tab");
   return parseInt(savedTab, 10) || 0;
 }
 
-export function Profile() {
+export async function Profile() {
   const theme = useTheme<Theme>();
   const { t } = useTranslation();
-
-  const username = KeyCloakService.GetUserName() || t("profile.notAvailable");
-  const userRoles = KeyCloakService.GetUserRoles() || [t("profile.notAvailable")];
-  const tokenParsed = KeyCloakService.GetTokenParsed() || t("profile.notAvailable");
-  const fullName = KeyCloakService.GetUserFullName() || username || t("profile.notAvailable");
-  const userEmail = KeyCloakService.GetUserMail() || t("profile.notAvailable");
-  const userId = KeyCloakService.GetUserId().substring(0, 8) || t("profile.notAvailable");
+  const authService = await getAuthService();
+  const username = authService.GetUserName() || t("profile.notAvailable");
+  const userRoles = authService.GetUserRoles() || [t("profile.notAvailable")];
+  const tokenParsed = authService.GetTokenParsed() || t("profile.notAvailable");
+  const fullName = authService.GetUserFullName() || username || t("profile.notAvailable");
+  const userEmail = authService.GetUserMail() || t("profile.notAvailable");
+  const userId = authService.GetUserId().substring(0, 8) || t("profile.notAvailable");
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -140,7 +140,7 @@ export function Profile() {
                   userId={userId}
                   formatAuthDate={formatAuthDate}
                   formatExpDate={formatExpDate}
-                  onLogout={KeyCloakService.CallLogout}
+                  onLogout={authService.CallLogout}
                 />
               )}
 

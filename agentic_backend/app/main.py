@@ -22,6 +22,7 @@ Entrypoint for the Agentic Backend App.
 import logging
 import os
 
+from app.config.security_controller import SecurityController
 from app.features.feedback.feedback_controller import FeedbackController
 from app.features.frugal.ai_service import AIService
 from app.features.frugal.carbon.carbon_controller import CarbonController
@@ -118,12 +119,14 @@ def create_app() -> FastAPI:
         CarbonController(router)
         EnergyController(router)
         FinopsController(router)
-
     # Register controllers
+    
     ChatbotController(router)
     FeedbackController(router, configuration.feedback_storage)
     ToolMetricStoreController(router)
     NodeMetricStoreController(router)
+    SecurityController(router)
+
 
     app.include_router(router)
     logger.info("🧩 All controllers registered.")

@@ -30,7 +30,7 @@ from app.features.scheduler.controller import SchedulerController
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_mcp import FastApiMCP
-from fred_core import initialize_keycloak
+from fred_core.security import initialize_security
 
 from app.application_context import ApplicationContext
 from app.common.structures import Configuration
@@ -84,7 +84,7 @@ def create_app() -> FastAPI:
 
     ApplicationContext(configuration)
     
-    initialize_keycloak(configuration)
+    initialize_security(configuration)
     
     app = FastAPI(
         docs_url=f"{configuration.app.base_url}/docs",
