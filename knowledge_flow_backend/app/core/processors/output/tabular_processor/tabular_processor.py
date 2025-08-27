@@ -14,6 +14,7 @@
 
 import logging
 import pandas as pd
+import re
 from pandas._libs.tslibs.nattype import NaTType
 from langchain.schema.document import Document
 import io
@@ -34,6 +35,19 @@ def _parse_date(value: str) -> pd.Timestamp | NaTType:
         return pd.to_datetime(dt)
     return pd.NaT
 
+def _sanitize_sql_name(name: str) -> str:
+    """
+    Sanitize a table or column name to be SQL-friendly:
+    - Lowercase
+    - Replace spaces and invalid characters with underscores
+    - Remove leading/trailing underscores
+    """
+    name = name.lower()
+    name = re.sub(r"[^a-z0-9_]", "_", name)
+    name = re.sub(r"_+", "_", name)
+    name = name.strip("_")
+    return name
+
 
 class TabularProcessor(BaseOutputProcessor):
     """
@@ -49,15 +63,15 @@ class TabularProcessor(BaseOutputProcessor):
         try:
             logger.info(f"Processing file: {file_path} with metadata: {metadata}")
 
-            # 1. Load the document
             document: Document = load_langchain_doc_from_metadata(file_path, metadata)
             logger.debug(f"Document loaded: {document}")
             if not document:
                 raise ValueError("Document is empty or not loaded correctly.")
 
-            # 2. Load the DataFrame from the document
             df = pd.read_csv(io.StringIO(document.page_content))
-            document_name = metadata.document_name.split(".")[0]
+            table_name = _sanitize_sql_name(metadata.document_name.split(".")[0])
+            df.columns = [_sanitize_sql_name(col) for col in df.columns]
+
             for col in df.columns:
                 if df[col].dtype == object:
                     sample_values = df[col].dropna().astype(str).head(10)
@@ -69,11 +83,10 @@ class TabularProcessor(BaseOutputProcessor):
 
             logger.debug(f"document {document}")
 
-            # 3. save the document into the selected tabular storage
             try:
                 if self.csv_input_store is None:
                     raise RuntimeError("csv_input_store is not initialized")
-                result = self.csv_input_store.save_table(document_name, df)
+                result = self.csv_input_store.save_table(table_name, df)
                 logger.debug(f"Document added to Tabular Store: {result}")
             except Exception as e:
                 logger.exception("Failed to add documents to Tabular Storage")
