@@ -22,6 +22,7 @@ import dateparser
 
 
 from app.application_context import ApplicationContext
+from app.common.utils import sanitize_sql_name
 from app.common.document_structures import DocumentMetadata, ProcessingStage
 from app.core.processors.output.vectorization_processor.vectorization_utils import load_langchain_doc_from_metadata
 from app.core.processors.output.base_output_processor import BaseOutputProcessor, TabularProcessingError
@@ -34,19 +35,6 @@ def _parse_date(value: str) -> pd.Timestamp | NaTType:
     if dt:
         return pd.to_datetime(dt)
     return pd.NaT
-
-def _sanitize_sql_name(name: str) -> str:
-    """
-    Sanitize a table or column name to be SQL-friendly:
-    - Lowercase
-    - Replace spaces and invalid characters with underscores
-    - Remove leading/trailing underscores
-    """
-    name = name.lower()
-    name = re.sub(r"[^a-z0-9_]", "_", name)
-    name = re.sub(r"_+", "_", name)
-    name = name.strip("_")
-    return name
 
 
 class TabularProcessor(BaseOutputProcessor):
@@ -69,8 +57,8 @@ class TabularProcessor(BaseOutputProcessor):
                 raise ValueError("Document is empty or not loaded correctly.")
 
             df = pd.read_csv(io.StringIO(document.page_content))
-            table_name = _sanitize_sql_name(metadata.document_name.split(".")[0])
-            df.columns = [_sanitize_sql_name(col) for col in df.columns]
+            table_name = sanitize_sql_name(metadata.document_name.rsplit(".", 1)[0])
+            df.columns = [sanitize_sql_name(col) for col in df.columns]
 
             for col in df.columns:
                 if df[col].dtype == object:
