@@ -14,6 +14,7 @@
 
 from pathlib import Path
 import pandas as pd
+import csv
 import logging
 from typing import Optional
 from app.core.processors.input.common.base_input_processor import BaseTabularProcessor
@@ -29,27 +30,37 @@ class CsvTabularProcessor(BaseTabularProcessor):
 
     def check_file_validity(self, file_path: Path) -> bool:
         return file_path.suffix.lower() == ".csv" and file_path.is_file()
+    
+    def detect_delimiter(self, file_path: Path, encodings: list[str]) -> str | None:
+        for enc in encodings:
+            try:
+                with open(file_path, encoding=enc) as f:
+                    sample = f.read(4096)  # lire un échantillon plus grand
+                    dialect = csv.Sniffer().sniff(sample, delimiters=[",", ";", "\t", "|"])
+                    return dialect.delimiter
+            except Exception:
+                continue
+        return None
 
-    def read_csv_flexible(self, path: Path, delimiters: Optional[list[str]] = None, encodings: Optional[list[str]] = None) -> pd.DataFrame:
-        if delimiters is None:
-            delimiters = [",", ";", "\t", "|"]
-        if encodings is None:
-            encodings = ["utf-8", "latin1", "iso-8859-1"]
-
+    def read_csv_flexible(self, path: Path, encodings: list[str] = ["utf-8", "latin1", "iso-8859-1"]) -> pd.DataFrame:
         if not self.check_file_validity(path):
             logger.error(f"File invalid or not found: {path}")
             return pd.DataFrame()
+        
+        delimiter = self.detect_delimiter(path, encodings)
+        if delimiter is None:
+            logger.error(f"Could not detect delimiter for file {path}")
+            return pd.DataFrame()
 
-        errors = []
         for enc in encodings:
-            for delim in delimiters:
-                try:
-                    df = pd.read_csv(path, delimiter=delim, encoding=enc)
-                    logger.info(f"CSV loaded successfully with delimiter '{delim}' and encoding '{enc}'")
-                    return df
-                except Exception as e:
-                    errors.append(f"delimiter='{delim}', encoding='{enc}': {e}")
-        logger.error(f"[ERROR] Failed to read CSV file '{path}'. Tried combinations:\n" + "\n".join(errors))
+            try:
+                df = pd.read_csv(path, sep=delimiter, encoding=enc, engine='python')
+                logger.info(f"CSV loaded successfully with delimiter '{delimiter}' and encoding '{enc}'")
+                return df
+            except Exception as e:
+                logger.warning(f"Failed to read CSV with encoding '{enc}': {e}")
+
+        logger.error(f"Failed to read CSV file '{path}' with detected delimiter '{delimiter}' and encodings {encodings}")
         return pd.DataFrame()
 
     def extract_file_metadata(self, file_path: Path) -> dict:
