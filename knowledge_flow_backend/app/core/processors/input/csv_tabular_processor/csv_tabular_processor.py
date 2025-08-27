@@ -16,7 +16,6 @@ from pathlib import Path
 import pandas as pd
 import csv
 import logging
-from typing import Optional
 from app.core.processors.input.common.base_input_processor import BaseTabularProcessor
 
 logger = logging.getLogger(__name__)
@@ -30,23 +29,23 @@ class CsvTabularProcessor(BaseTabularProcessor):
 
     def check_file_validity(self, file_path: Path) -> bool:
         return file_path.suffix.lower() == ".csv" and file_path.is_file()
-    
-    def detect_delimiter(self, file_path: Path, encodings: list[str]) -> str | None:
+
+    def detect_delimiter(self, file_path: Path, encodings: list[str]) -> str:
         for enc in encodings:
             try:
                 with open(file_path, encoding=enc) as f:
-                    sample = f.read(4096)  # lire un échantillon plus grand
-                    dialect = csv.Sniffer().sniff(sample, delimiters=[",", ";", "\t", "|"])
+                    sample = f.read(4096)
+                    dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
                     return dialect.delimiter
-            except Exception:
-                continue
-        return None
+            except Exception as e:
+                logger.warning(f"Failed to detect the delemiter, error: {e}")
+        return ","
 
     def read_csv_flexible(self, path: Path, encodings: list[str] = ["utf-8", "latin1", "iso-8859-1"]) -> pd.DataFrame:
         if not self.check_file_validity(path):
             logger.error(f"File invalid or not found: {path}")
             return pd.DataFrame()
-        
+
         delimiter = self.detect_delimiter(path, encodings)
         if delimiter is None:
             logger.error(f"Could not detect delimiter for file {path}")
@@ -54,7 +53,7 @@ class CsvTabularProcessor(BaseTabularProcessor):
 
         for enc in encodings:
             try:
-                df = pd.read_csv(path, sep=delimiter, encoding=enc, engine='python')
+                df = pd.read_csv(path, sep=delimiter, encoding=enc, engine="python")
                 logger.info(f"CSV loaded successfully with delimiter '{delimiter}' and encoding '{enc}'")
                 return df
             except Exception as e:

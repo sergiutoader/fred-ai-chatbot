@@ -195,7 +195,8 @@ def count_tokens(text: str) -> int:
         logger.warning(f"Fallback to cl100k_base tokenizer due to error: {e}")
         encoding = tiktoken.get_encoding("cl100k_base")
         return len(encoding.encode(text))
-    
+
+
 def sanitize_sql_name(name: str) -> str:
     """
     Sanitize a table or column name to be SQL-friendly:
@@ -208,4 +209,3 @@ def sanitize_sql_name(name: str) -> str:
     name = re.sub(r"_+", "_", name)
     name = name.strip("_")
     return name
-

@@ -14,7 +14,6 @@
 
 import logging
 import pandas as pd
-import re
 from pandas._libs.tslibs.nattype import NaTType
 from langchain.schema.document import Document
 import io
