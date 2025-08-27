@@ -13,10 +13,12 @@
 # limitations under the License.
 
 from pathlib import Path
-
-import pandas
-
+import pandas as pd
+import logging
+from typing import Optional
 from app.core.processors.input.common.base_input_processor import BaseTabularProcessor
+
+logger = logging.getLogger(__name__)
 
 
 class CsvTabularProcessor(BaseTabularProcessor):
@@ -28,14 +30,44 @@ class CsvTabularProcessor(BaseTabularProcessor):
     def check_file_validity(self, file_path: Path) -> bool:
         return file_path.suffix.lower() == ".csv" and file_path.is_file()
 
-    def extract_file_metadata(self, file_path: Path) -> dict:
-        df = pandas.read_csv(file_path, nrows=5)
-        return {
-            "suffix": "CSV",
-            "row_count": len(pandas.read_csv(file_path)),  # optional: use nrows param if needed
-            "num_columns": len(df.columns),
-            "sample_columns": df.columns.tolist(),
-        }
+    def read_csv_flexible(self, path: Path, delimiters: Optional[list[str]] = None, encodings: Optional[list[str]] = None) -> pd.DataFrame:
+        if delimiters is None:
+            delimiters = [",", ";", "\t", "|"]
+        if encodings is None:
+            encodings = ["utf-8", "latin1", "iso-8859-1"]
 
-    def convert_file_to_table(self, file_path: Path) -> pandas.DataFrame:
-        return pandas.read_csv(file_path)
+        if not self.check_file_validity(path):
+            logger.error(f"File invalid or not found: {path}")
+            return pd.DataFrame()
+
+        errors = []
+        for enc in encodings:
+            for delim in delimiters:
+                try:
+                    df = pd.read_csv(path, delimiter=delim, encoding=enc)
+                    logger.info(f"CSV loaded successfully with delimiter '{delim}' and encoding '{enc}'")
+                    return df
+                except Exception as e:
+                    errors.append(f"delimiter='{delim}', encoding='{enc}': {e}")
+        logger.error(f"[ERROR] Failed to read CSV file '{path}'. Tried combinations:\n" + "\n".join(errors))
+        return pd.DataFrame()
+
+    def extract_file_metadata(self, file_path: Path) -> dict:
+        df = self.read_csv_flexible(file_path)
+        if df is not None:
+            return {
+                "suffix": "CSV",
+                "row_count": len(df),
+                "num_columns": len(df.columns),
+                "sample_columns": df.columns.tolist(),
+            }
+        else:
+            return {
+                "suffix": "CSV",
+                "row_count": 0,
+                "num_columns": 0,
+                "sample_columns": [],
+            }
+
+    def convert_file_to_table(self, file_path: Path) -> pd.DataFrame:
+        return self.read_csv_flexible(file_path)

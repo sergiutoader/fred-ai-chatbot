@@ -33,7 +33,6 @@ def _parse_date(value: str) -> pd.Timestamp | NaTType:
     if dt:
         return pd.to_datetime(dt)
     return pd.NaT
-    return pd.NaT
 
 
 class TabularProcessor(BaseOutputProcessor):
