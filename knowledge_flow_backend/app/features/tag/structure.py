@@ -23,6 +23,8 @@ class TagType(str, Enum):
     DOCUMENT = "document"
     PROMPT = "prompt"
     TEMPLATE = "template"
+    AGENT = "agent"
+    MCP = "mcp"
 
 
 def _normalize_path(p: Optional[str]) -> Optional[str]:

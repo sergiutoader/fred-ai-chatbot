@@ -31,24 +31,32 @@ logger = logging.getLogger(__name__)
 
 
 def _tagtype_to_rk(tag_type: TagType) -> ResourceKind:
+    """
+    Map TagType -> ResourceKind for resources managed by ResourceService.
+    DOCUMENT is intentionally excluded (managed by MetadataService).
+    """
     if tag_type == TagType.PROMPT:
         return ResourceKind.PROMPT
     if tag_type == TagType.TEMPLATE:
         return ResourceKind.TEMPLATE
+    if tag_type == TagType.AGENT:
+        return ResourceKind.AGENT
+    if tag_type == TagType.MCP:
+        return ResourceKind.MCP
     raise ValueError(f"Unsupported TagType for resources: {tag_type}")
 
 
 class TagService:
     """
     Service for Tag CRUD, user-scoped, with hierarchical path support.
-    Documents & prompts still link by tag *id* (no change to metadata schema).
+    Documents & prompts/templates/agents/mcp still link by tag *id* (no change to metadata schema).
     """
 
     def __init__(self):
         context = ApplicationContext.get_instance()
         self._tag_store = context.get_tag_store()
         self.document_metadata_service = MetadataService()
-        self.resource_service = ResourceService()  # For templates, if needed
+        self.resource_service = ResourceService()
 
     # ---------- Public API ----------
 
@@ -88,10 +96,9 @@ class TagService:
         for tag in sliced:
             if tag.type == TagType.DOCUMENT:
                 item_ids = self._retrieve_document_ids_for_tag(tag.id)
-            elif tag.type == TagType.PROMPT:
-                item_ids = self.resource_service.get_resource_ids_for_tag(ResourceKind.PROMPT, tag.id)
-            elif tag.type == TagType.TEMPLATE:
-                item_ids = self.resource_service.get_resource_ids_for_tag(ResourceKind.TEMPLATE, tag.id)
+            elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
+                rk = _tagtype_to_rk(tag.type)
+                item_ids = self.resource_service.get_resource_ids_for_tag(rk, tag.id)
             else:
                 raise ValueError(f"Unsupported tag type: {tag.type}")
             result.append(TagWithItemsId.from_tag(tag, item_ids))
@@ -101,10 +108,9 @@ class TagService:
         tag = self._tag_store.get_tag_by_id(tag_id)
         if tag.type == TagType.DOCUMENT:
             item_ids = self._retrieve_document_ids_for_tag(tag_id)
-        elif tag.type == TagType.PROMPT:
-            item_ids = self.resource_service.get_resource_ids_for_tag(ResourceKind.PROMPT, tag.id)
-        elif tag.type == TagType.TEMPLATE:
-            item_ids = self.resource_service.get_resource_ids_for_tag(ResourceKind.TEMPLATE, tag.id)
+        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
+            rk = _tagtype_to_rk(tag.type)
+            item_ids = self.resource_service.get_resource_ids_for_tag(rk, tag.id)
         else:
             raise ValueError(f"Unsupported tag type: {tag.type}")
         return TagWithItemsId.from_tag(tag, item_ids)
@@ -113,8 +119,11 @@ class TagService:
         # Validate referenced items first
         if tag_data.type == TagType.DOCUMENT:
             documents = self._retrieve_documents_metadata(tag_data.item_ids)
-        elif tag_data.type in (TagType.PROMPT, TagType.TEMPLATE):
+        elif tag_data.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
             documents = []  # not used here
+            # Optionnel: validation côté ResourceService si tu veux fail-fast sur ids inexistants
+            # rk = _tagtype_to_rk(tag_data.type)
+            # self.resource_service.assert_resources_exist(rk, tag_data.item_ids)
         else:
             raise ValueError(f"Unsupported tag type: {tag_data.type}")
 
@@ -140,14 +149,18 @@ class TagService:
         # Link items
         if tag.type == TagType.DOCUMENT:
             for doc in documents:
-                self.document_metadata_service.add_tag_id_to_document(metadata=doc, new_tag_id=tag.id, modified_by=user.username)
-        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE):
-            # rk = _tagtype_to_rk(tag.type)
+                self.document_metadata_service.add_tag_id_to_document(
+                    metadata=doc,
+                    new_tag_id=tag.id,
+                    modified_by=user.username,
+                )
+        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
+            rk = _tagtype_to_rk(tag.type)
             for rid in tag_data.item_ids:
                 try:
                     self.resource_service.add_tag_to_resource(rid, tag.id)
                 except Exception as e:
-                    logger.warning(f"Failed to attach tag {tag.id} to resource {rid}: {e}")
+                    logger.warning(f"Failed to attach tag {tag.id} to {rk} resource {rid}: {e}")
                     raise
 
         return TagWithItemsId.from_tag(tag, tag_data.item_ids)
@@ -167,7 +180,7 @@ class TagService:
             for doc in removed_documents:
                 self.document_metadata_service.remove_tag_id_from_document(doc, tag.id, modified_by=user.username)
 
-        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE):
+        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
             rk = _tagtype_to_rk(tag.type)
             old_item_ids = self.resource_service.get_resource_ids_for_tag(rk, tag_id)
             added, removed = self._compute_ids_diff(old_item_ids, tag_data.item_ids)
@@ -176,7 +189,6 @@ class TagService:
                 try:
                     self.resource_service.add_tag_to_resource(rid, tag_id)
                 except Exception:
-                    # Decide whether to continue or fail fast
                     raise
             for rid in removed:
                 try:
@@ -193,7 +205,7 @@ class TagService:
         # For the response, return the up-to-date list of item ids
         if tag.type == TagType.DOCUMENT:
             item_ids = self._retrieve_document_ids_for_tag(tag_id)
-        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE):
+        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
             rk = _tagtype_to_rk(tag.type)
             item_ids = self.resource_service.get_resource_ids_for_tag(rk, tag_id)
         else:
@@ -208,11 +220,9 @@ class TagService:
             documents = self._retrieve_documents_for_tag(tag_id)
             for doc in documents:
                 self.document_metadata_service.remove_tag_id_from_document(doc, tag_id, modified_by=user.username)
-        elif tag.type == TagType.PROMPT:
-            self.resource_service.remove_tag_from_resources(ResourceKind.PROMPT, tag_id)
-        elif tag.type == TagType.TEMPLATE:
-            # BUGFIX: was PROMPT before; must be TEMPLATE
-            self.resource_service.remove_tag_from_resources(ResourceKind.TEMPLATE, tag_id)
+        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
+            rk = _tagtype_to_rk(tag.type)
+            self.resource_service.remove_tag_from_resources(rk, tag_id)
         else:
             raise ValueError(f"Unsupported tag type: {tag.type}")
 
@@ -266,5 +276,7 @@ class TagService:
         existing = self._tag_store.get_by_owner_type_full_path(owner_id, tag_type, full_path)
         if existing and existing.id != (exclude_tag_id or ""):
             if existing.type == tag_type:
-                raise TagAlreadyExistsError(f"Tag '{full_path}' already exists for owner {owner_id} and type {tag_type}.")
+                raise TagAlreadyExistsError(
+                    f"Tag '{full_path}' already exists for owner {owner_id} and type {tag_type}."
+                )
         return

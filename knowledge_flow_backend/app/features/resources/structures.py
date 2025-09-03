@@ -23,6 +23,8 @@ from fred_core import BaseModelWithId
 class ResourceKind(str, Enum):
     PROMPT = "prompt"
     TEMPLATE = "template"
+    AGENT = "agent"
+    MCP = "mcp"
 
 
 class ResourceUpdate(BaseModel):

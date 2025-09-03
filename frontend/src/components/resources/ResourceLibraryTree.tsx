@@ -13,8 +13,12 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 
 import { TagNode } from "../tags/tagTree";
-import { Resource, TagWithItemsId } from "../../slices/knowledgeFlow/knowledgeFlowOpenApi";
+import {
+  Resource,
+  TagWithItemsId,
+} from "../../slices/knowledgeFlow/knowledgeFlowOpenApi";
 import { ResourceRowCompact } from "./ResourceRowCompact";
+import { AgentRowCard, isAgentResource } from "./AgentRowCard";
 
 /* --------------------------------------------------------------------------
  * Helpers (mirrors DocumentLibraryTree)
@@ -91,7 +95,6 @@ export function ResourceLibraryTree({
   selectedItems = {},
   setSelectedItems,
 }: Props) {
-  /** Select/unselect all resources in a folder’s subtree (by that folder’s primary tag). */
   const toggleFolderSelection = React.useCallback(
     (node: TagNode) => {
       if (!setSelectedItems) return;
@@ -99,7 +102,9 @@ export function ResourceLibraryTree({
       if (!tag) return;
 
       const subtree = resourcesInSubtree(node, resources, getChildren);
-      const eligible = subtree.filter((r) => resourceBelongsToNode(r, node) && (r as any).library_tags?.includes(tag.id));
+      const eligible = subtree.filter(
+        (r) => resourceBelongsToNode(r, node) && (r as any).library_tags?.includes(tag.id),
+      );
       if (eligible.length === 0) return;
 
       setSelectedItems((prev) => {
@@ -211,37 +216,54 @@ export function ResourceLibraryTree({
             const tag = hereTag; // context tag for row selection/delete
             const isSelectedHere = tag ? selectedItems[rid]?.id === tag.id : false;
 
+            const left = (
+              <Checkbox
+                size="small"
+                disabled={!tag || !setSelectedItems}
+                checked={!!isSelectedHere}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!tag || !setSelectedItems) return;
+                  setSelectedItems((prev) => {
+                    const next = { ...prev };
+                    if (next[rid]?.id === tag.id) delete next[rid];
+                    else next[rid] = tag;
+                    return next;
+                  });
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              />
+            );
+
+            const labelDefault = (
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.5 }}>
+                {left}
+                <ResourceRowCompact
+                  resource={r}
+                  onPreview={onPreview}
+                  onEdit={onEdit}
+                  onRemoveFromLibrary={tag && onRemoveFromLibrary ? (rr) => onRemoveFromLibrary(rr, tag) : undefined}
+                />
+              </Box>
+            );
+
+            const labelAgent = (
+              <Box sx={{ display: "flex", alignItems: "stretch", gap: 1, px: 0.5 }}>
+                {left}
+                <AgentRowCard
+                  resource={r}
+                  onPreview={onPreview}
+                  onEdit={onEdit}
+                  onRemoveFromLibrary={tag && onRemoveFromLibrary ? (rr) => onRemoveFromLibrary(rr, tag) : undefined}
+                />
+              </Box>
+            );
+
             return (
               <TreeItem
                 key={rid}
                 itemId={rid}
-                label={
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 0.5 }}>
-                    <Checkbox
-                      size="small"
-                      disabled={!tag || !setSelectedItems}
-                      checked={!!isSelectedHere}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!tag || !setSelectedItems) return;
-                        setSelectedItems((prev) => {
-                          const next = { ...prev };
-                          if (next[rid]?.id === tag.id) delete next[rid];
-                          else next[rid] = tag;
-                          return next;
-                        });
-                      }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    />
-
-                    <ResourceRowCompact
-                      resource={r}
-                      onPreview={onPreview}
-                      onEdit={onEdit}
-                      onRemoveFromLibrary={tag && onRemoveFromLibrary ? (rr) => onRemoveFromLibrary(rr, tag) : undefined}
-                    />
-                  </Box>
-                }
+                label={isAgentResource(r) ? labelAgent : labelDefault}
               />
             );
           })}
@@ -251,9 +273,7 @@ export function ResourceLibraryTree({
 
   return (
     <SimpleTreeView
-      sx={{
-        "& .MuiTreeItem-content .MuiTreeItem-label": { flex: 1, width: "100%", overflow: "visible" },
-      }}
+      sx={{ "& .MuiTreeItem-content .MuiTreeItem-label": { flex: 1, width: "100%", overflow: "visible" } }}
       expandedItems={expanded}
       onExpandedItemsChange={(_, ids) => setExpanded(ids as string[])}
       slots={{ expandIcon: KeyboardArrowRightIcon, collapseIcon: KeyboardArrowDownIcon }}

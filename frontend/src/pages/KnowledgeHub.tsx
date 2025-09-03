@@ -22,7 +22,7 @@ import InvisibleLink from "../components/InvisibleLink";
 import DocumentLibraryList from "../components/documents/libraries/DocumentLibraryList";
 import ResourceLibraryList from "../components/resources/ResourceLibraryList";
 
-const knowledgeHubViews = ["templates", "prompts", "operations", "documents"] as const;
+const knowledgeHubViews = ["mcp", "agents", "templates", "prompts", "operations", "documents"] as const;
 type KnowledgeHubView = (typeof knowledgeHubViews)[number];
 
 function isKnowledgeHubView(value: string): value is KnowledgeHubView {
@@ -50,6 +50,16 @@ export const KnowledgeHub = () => {
       <TopBar title={t("knowledge.title")} description={t("knowledge.description")}>
         <Box>
           <ButtonGroup variant="outlined" color="primary" size="small">
+            <InvisibleLink to="/knowledge?view=mcp">
+              <Button variant={selectedView === "mcp" ? "contained" : "outlined"}>
+                {t("knowledge.viewSelector.mcp")}
+              </Button>
+            </InvisibleLink>
+            <InvisibleLink to="/knowledge?view=agents">
+              <Button variant={selectedView === "agents" ? "contained" : "outlined"}>
+                {t("knowledge.viewSelector.agents")}
+              </Button>
+            </InvisibleLink>
             <InvisibleLink to="/knowledge?view=templates">
               <Button variant={selectedView === "templates" ? "contained" : "outlined"}>
                 {t("knowledge.viewSelector.templates")}
@@ -75,6 +85,16 @@ export const KnowledgeHub = () => {
       </TopBar>
 
       <Box sx={{ mb: 3 }}>
+        {selectedView === "mcp" && (
+          <Container maxWidth="xl">
+            <ResourceLibraryList kind="mcp" />
+          </Container>
+        )}
+        {selectedView === "agents" && (
+          <Container maxWidth="xl">
+            <ResourceLibraryList kind="agent" />
+          </Container>
+        )}
         {selectedView === "documents" && (
           <Container maxWidth="xl">
             <DocumentLibraryList />

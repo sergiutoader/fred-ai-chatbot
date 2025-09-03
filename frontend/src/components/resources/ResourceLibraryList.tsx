@@ -37,9 +37,11 @@ import { ResourcePreviewModal } from "./ResourcePreviewModal";
 import { ResourceImportDrawer } from "./ResourceImportDrawer";
 import { useConfirmationDialog } from "../ConfirmationDialogProvider";
 import { useTagCommands } from "../../common/useTagCommands";
+import { AgentEditorModal } from "./AgentEditorModal";
+import { McpEditorModal } from "./McpEditorModal";
 
 /** Small i18n helper */
-export const useKindLabels = (kind: "prompt" | "template") => {
+export const useKindLabels = (kind: "prompt" | "template" | "mcp" | "agent") => {
   const { t } = useTranslation();
   return {
     one: t(`resource.kind.${kind}.one`),
@@ -276,7 +278,7 @@ export default function ResourceLibraryList({ kind }: Props) {
         {/* Search */}
         <TextField
           size="small"
-          placeholder={t("resourceLibrary.searchPlaceholder", {typeOne}) || "Search resources…"}
+          placeholder={t("resourceLibrary.searchPlaceholder", { typeOne }) || "Search resources…"}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           sx={{ minWidth: 260 }}
@@ -376,6 +378,28 @@ export default function ResourceLibraryList({ kind }: Props) {
       {/* Create modals */}
       {kind === "template" ? (
         <TemplateEditorModal
+          isOpen={openCreateResource}
+          onClose={() => setOpenCreateResource(false)}
+          onSave={async (payload) => {
+            if (!uploadTargetTagId) return;
+            await createResource(payload, uploadTargetTagId);
+            setOpenCreateResource(false);
+            await Promise.all([refetchTags(), refetchResources()]);
+          }}
+        />
+      ) : kind === "agent" ? (
+        <AgentEditorModal
+          isOpen={openCreateResource}
+          onClose={() => setOpenCreateResource(false)}
+          onSave={async (payload) => {
+            if (!uploadTargetTagId) return;
+            await createResource(payload, uploadTargetTagId);
+            setOpenCreateResource(false);
+            await Promise.all([refetchTags(), refetchResources()]);
+          }}
+        />
+      ) : kind === "mcp" ? (
+        <McpEditorModal
           isOpen={openCreateResource}
           onClose={() => setOpenCreateResource(false)}
           onSave={async (payload) => {
