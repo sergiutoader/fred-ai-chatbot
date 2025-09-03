@@ -34,6 +34,13 @@ to define clear workflows and data structures.
 """
 
 
+class EmbeddingProvider(str, Enum):
+    OPENAI = "openai"
+    AZUREOPENAI = "azureopenai"
+    AZUREAPIM = "azureapim"
+    OLLAMA = "ollama"
+
+
 class Status(str, Enum):
     SUCCESS = "success"
     IGNORED = "ignored"
@@ -118,7 +125,7 @@ VectorStorageConfig = Annotated[Union[InMemoryVectorStorage, OpenSearchIndexConf
 
 
 class EmbeddingConfig(BaseModel):
-    type: str = Field(..., description="The embedding backend to use (e.g., 'openai', 'azureopenai')")
+    type: EmbeddingProvider = Field(..., description="The embedding backend to use (e.g., 'openai', 'azureopenai')")
 
 
 class TemporalSchedulerConfig(BaseModel):

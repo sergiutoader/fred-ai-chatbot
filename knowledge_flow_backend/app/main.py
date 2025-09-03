@@ -47,6 +47,7 @@ from app.features.tabular.controller import TabularController
 from app.features.tag.controller import TagController
 from app.features.vector_search.controller import VectorSearchController
 from app.features.ingestion.controller import IngestionController
+from app.core.monitoring.monitoring_controller import MonitoringController
 
 # -----------------------
 # LOGGING + ENVIRONMENT
@@ -107,6 +108,8 @@ def create_app() -> FastAPI:
 
     router = APIRouter(prefix=configuration.app.base_url)
 
+    MonitoringController(router)
+    
     pull_document_service = PullDocumentService()
     # Register controllers
     MetadataController(router, pull_document_service)
@@ -241,7 +244,7 @@ def create_app() -> FastAPI:
             "to customize agent behavior or generate well-structured custom reports. "
             "Use this MCP to browse, retrieve, and apply predefined resources when composing answers or building workflows."
         ),
-        include_tags=["Resources"],
+        include_tags=["Resources", "Tags"],
         describe_all_responses=True,
         describe_full_response_schema=True,
         auth_config=AuthConfig(  # <-- protect with your user auth as a normal dependency
@@ -259,4 +262,4 @@ def create_app() -> FastAPI:
 
 if __name__ == "__main__":
     print("To start the app, use uvicorn cli with:")
-    print("uv run uvicorn --factory app.main:create_app ...")
+    print("uv run uvicorn app.main:create_app --factory ...")
