@@ -7,7 +7,9 @@
   "resource": {
     "kind": {
       "prompt":   { "one": "prompt",   "other": "prompts" },
-      "template": { "one": "template", "other": "templates" }
+      "template": { "one": "template", "other": "templates" },
+      "agent": { "one": "agent", "other": "agents" },
+      "mcp": { "one": "MCP server", "other": "MCP servers" }
     }
   },
   "validation": {
@@ -131,7 +133,8 @@
       "oneRecording": "1 recording",
       "libraries": "Libraries ({{count}})",
       "prompts": "Prompts ({{count}})",
-      "templates": "Templates ({{count}})"
+      "templates": "Templates ({{count}})",
+      "agents": "Agents ({{count}})"
     }
   },
   "settings": {
@@ -226,7 +229,9 @@
       "templates": "Templates",
       "prompts": "Prompts",
       "documents": "Documents",
-      "operations": "Operations"
+      "operations": "Operations",
+      "agents": "Agents",
+      "mcp": "MCP servers"
     }
   },
   "documentLibrary": {
