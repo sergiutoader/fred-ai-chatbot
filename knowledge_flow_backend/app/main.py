@@ -109,7 +109,7 @@ def create_app() -> FastAPI:
     router = APIRouter(prefix=configuration.app.base_url)
 
     MonitoringController(router)
-    
+
     pull_document_service = PullDocumentService()
     # Register controllers
     MetadataController(router, pull_document_service)
@@ -262,4 +262,4 @@ def create_app() -> FastAPI:
 
 if __name__ == "__main__":
     print("To start the app, use uvicorn cli with:")
-    print("uv run uvicorn --factory app.main:create_app ...")
+    print("uv run uvicorn app.main:create_app --factory ...")
