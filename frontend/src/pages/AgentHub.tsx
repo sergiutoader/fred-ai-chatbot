@@ -25,13 +25,15 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import StarIcon from "@mui/icons-material/Star";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import Grid2 from "@mui/material/Grid2";
+import yaml from "js-yaml";
+
 import { LoadingSpinner } from "../utils/loadingSpinner";
 import { TopBar } from "../common/TopBar";
 import { AgentCard } from "../components/agentHub/AgentCard";
 import { CreateAgentModal } from "../components/agentHub/CreateAgentModal";
 import { useConfirmationDialog } from "../components/ConfirmationDialogProvider";
 
-// OpenAPI
+// Agentic flows OpenAPI
 import {
   AgenticFlow,
   GetAgenticFlowsAgenticV1ChatbotAgenticflowsGetApiResponse,
@@ -39,9 +41,94 @@ import {
   useLazyGetAgenticFlowsAgenticV1ChatbotAgenticflowsGetQuery,
 } from "../slices/agentic/agenticOpenApi";
 
+// Knowledge Flow OpenAPI (Resources)
+import {
+  Resource as KFResource,
+  // Adjust the hook name if your generator differs.
+  useLazyListResourcesByKindKnowledgeFlowV1ResourcesGetQuery,
+} from "../slices/knowledgeFlow/knowledgeFlowOpenApi";
+
+/* ----------------------- Compact helpers ----------------------- */
+
 interface AgentCategory {
   name: string;
   isTag?: boolean;
+}
+
+/** Compact, multi-doc tolerant header parser. */
+function parseHeaderFromContent(text?: string): Record<string, any> {
+  if (typeof text !== "string") return {};
+  const s = text.trim();
+  if (!s) return {};
+
+  // Fast-path: front-matter block at start
+  if (s.startsWith("---")) {
+    const fm = s.slice(3).split(/\n---\s*\n/, 1)[0];
+    if (fm) {
+      try {
+        const h = yaml.load(fm);
+        if (h && typeof h === "object") return h as Record<string, any>;
+      } catch {}
+    }
+  }
+
+  // Load all YAML docs (works for single or multi-doc). Fallback to JSON.
+  const docs: any[] = [];
+  try {
+    yaml.loadAll(s, (d) => d && typeof d === "object" && docs.push(d));
+  } catch {
+    if (s.startsWith("{")) {
+      try {
+        const j = JSON.parse(s);
+        if (j && typeof j === "object") docs.push(j);
+      } catch {}
+    }
+  }
+
+  // Pick the most informative doc.
+  const pick =
+    docs.find((d) => d.kind) ||
+    docs.find((d) => Array.isArray(d.servers) || Array.isArray(d.mcpServers) || Array.isArray(d.mcp_servers)) ||
+    docs[0];
+
+  return pick && typeof pick === "object" ? (pick as Record<string, any>) : {};
+}
+
+/** Map a resource (kind: agent) to the AgenticFlow shape. */
+function mapResourceAgentToFlow(r: KFResource): AgenticFlow | null {
+  const h = parseHeaderFromContent((r as any)?.content);
+  const pick = <T,>(...v: (T | undefined | null)[]) => v.find((x) => x !== undefined && x !== null);
+
+  const name = pick<string>((r as any)?.name, (r as any)?.metadata?.name, h?.name);
+  if (!name) return null;
+
+  const role = pick<string>((r as any)?.role, (r as any)?.metadata?.role, h?.role);
+  const nickname = pick<string>((r as any)?.nickname, (r as any)?.metadata?.nickname, h?.nickname);
+  const description = pick<string>((r as any)?.description, (r as any)?.metadata?.description, h?.description);
+  const icon = pick<string>((r as any)?.icon, (r as any)?.metadata?.icon, h?.icon);
+  const labels =
+    (pick<string[]>((r as any)?.labels, (r as any)?.metadata?.labels, h?.labels) ?? []) as string[];
+
+  const tag = Array.isArray(labels) && labels.length ? String(labels[0]) : undefined;
+
+  return {
+    name,
+    role,
+    nickname,
+    description,
+    icon,
+    experts: [], // required by AgenticFlow
+    tag,
+    tags: tag, // legacy compat
+  } as AgenticFlow;
+}
+
+/** Merge flows + resources, dedupe by name (flows take precedence). */
+function mergeAgents(flowAgents: AgenticFlow[], resourceAgents: AgenticFlow[]): AgenticFlow[] {
+  const all = [...(resourceAgents || []), ...(flowAgents || [])].filter(
+    (a): a is AgenticFlow => !!a && !!a.name
+  );
+  return [...new Map(all.map((a) => [a.name, a] as const)).values()];
 }
 
 const extractUniqueTags = (agents: AgenticFlow[]): string[] =>
@@ -50,18 +137,23 @@ const extractUniqueTags = (agents: AgenticFlow[]): string[] =>
     .filter((t) => t && t.trim() !== "")
     .filter((tag, idx, self) => self.indexOf(tag) === idx);
 
-const mapFlowsToAgents = (flows: GetAgenticFlowsAgenticV1ChatbotAgenticflowsGetApiResponse): AgenticFlow[] =>
+const mapFlowsToAgents = (
+  flows: GetAgenticFlowsAgenticV1ChatbotAgenticflowsGetApiResponse
+): AgenticFlow[] =>
   (flows || []).map((f) => ({
     name: f.name,
     role: f.role,
     nickname: f.nickname ?? undefined,
     description: f.description,
     icon: f.icon ?? undefined,
-    experts: f.experts ?? undefined,
-    tag: f.tag ?? undefined,
-    // keep .tags for legacy code reading it
-    tags: f.tag ?? undefined,
+    // ensure required property is present
+    experts: Array.isArray((f as any).experts) ? (f as any).experts : [],
+    tag: (f as any).tag ?? undefined,
+    // legacy compatibility
+    tags: (f as any).tag ?? undefined,
   })) as AgenticFlow[];
+
+/* ----------------------- UI ----------------------- */
 
 const ActionButton = ({
   icon,
@@ -102,7 +194,8 @@ export const AgentHub = () => {
   const theme = useTheme();
   const { t } = useTranslation();
 
-  const [agenticFlows, setAgenticFlows] = useState<AgenticFlow[]>([]);
+  // Unified agents list (flows + resources)
+  const [agents, setAgents] = useState<AgenticFlow[]>([]);
   const [tabValue, setTabValue] = useState(0);
   const [showElements, setShowElements] = useState(false);
   const [favoriteAgents, setFavoriteAgents] = useState<string[]>([]);
@@ -112,7 +205,14 @@ export const AgentHub = () => {
   const handleOpenCreateAgent = () => setIsCreateModalOpen(true);
   const handleCloseCreateAgent = () => setIsCreateModalOpen(false);
 
-  const [triggerGetFlows, { isFetching }] = useLazyGetAgenticFlowsAgenticV1ChatbotAgenticflowsGetQuery();
+  // Agentic flows
+  const [triggerGetFlows, { isFetching: loadingFlows }] =
+    useLazyGetAgenticFlowsAgenticV1ChatbotAgenticflowsGetQuery();
+
+  // Knowledge hub resources (kind=agent)
+  const [triggerListAgentResources, { isFetching: loadingResources }] =
+    useLazyListResourcesByKindKnowledgeFlowV1ResourcesGetQuery();
+
   const [deleteAgent] = useDeleteAgentAgenticV1AgentsNameDeleteMutation();
   const { showConfirmationDialog } = useConfirmationDialog();
 
@@ -131,15 +231,33 @@ export const AgentHub = () => {
     });
   };
 
+  /** Fetch both sources, merge and compute categories. */
   const fetchAgents = async () => {
     try {
+      // 1) Agentic flows
       const flows = await triggerGetFlows().unwrap();
-      const mapped = mapFlowsToAgents(flows);
-      setAgenticFlows(mapped);
+      const flowAgents = mapFlowsToAgents(flows);
 
-      const tags = extractUniqueTags(mapped);
+      // 2) Resources with kind=agent
+      let resourceAgents: AgenticFlow[] = [];
+      try {
+        const res = await triggerListAgentResources({ kind: "agent" }).unwrap();
+        resourceAgents = (res as KFResource[])
+          .map(mapResourceAgentToFlow)
+          .filter(Boolean) as AgenticFlow[];
+      } catch (e) {
+        console.warn("[AgentHub] listing resources kind=agent failed:", e);
+      }
+
+      // 3) Merge (flows take precedence by name)
+      const merged = mergeAgents(flowAgents, resourceAgents);
+      setAgents(merged);
+
+      // 4) Tabs/categories from unique tags
+      const tags = extractUniqueTags(merged);
       setCategories([{ name: "all" }, { name: "favorites" }, ...tags.map((tag) => ({ name: tag, isTag: true }))]);
 
+      // 5) Restore favorites
       const savedFavorites = localStorage.getItem("favoriteAgents");
       if (savedFavorites) setFavoriteAgents(JSON.parse(savedFavorites));
     } catch (err) {
@@ -156,14 +274,14 @@ export const AgentHub = () => {
   const handleTabChange = (_event: SyntheticEvent, newValue: number) => setTabValue(newValue);
 
   const filteredAgents = useMemo(() => {
-    if (tabValue === 0) return agenticFlows;
-    if (tabValue === 1) return agenticFlows.filter((a) => favoriteAgents.includes(a.name));
+    if (tabValue === 0) return agents;
+    if (tabValue === 1) return agents.filter((a) => favoriteAgents.includes(a.name));
     if (categories.length > 2 && tabValue >= 2) {
       const tagName = categories[tabValue].name;
-      return agenticFlows.filter((a) => a.tag === tagName);
+      return agents.filter((a) => a.tag === tagName);
     }
-    return agenticFlows;
-  }, [tabValue, agenticFlows, favoriteAgents, categories]);
+    return agents;
+  }, [tabValue, agents, favoriteAgents, categories]);
 
   const toggleFavorite = (agentName: string) => {
     const updated = favoriteAgents.includes(agentName)
@@ -179,6 +297,8 @@ export const AgentHub = () => {
     if (categories.length > 2 && tabValue >= 2) return `${categories[tabValue].name} ${t("agentHub.agents")}`;
     return t("agentHub.agents");
   }, [tabValue, categories, t]);
+
+  const isFetching = loadingFlows || loadingResources;
 
   return (
     <>
@@ -236,8 +356,8 @@ export const AgentHub = () => {
                     isFav
                       ? favoriteAgents.length
                       : isTag
-                      ? agenticFlows.filter((a) => a.tag === category.name).length
-                      : agenticFlows.length;
+                      ? agents.filter((a) => a.tag === category.name).length
+                      : agents.length;
 
                   return (
                     <Tab
@@ -313,19 +433,33 @@ export const AgentHub = () => {
                     </Box>
                   </Box>
 
-                  {/* Grid */}
+                  {/* Grid with uniform card heights */}
                   {filteredAgents.length > 0 ? (
-                    <Grid2 container spacing={2}>
+                    <Grid2
+                      container
+                      spacing={2}
+                      sx={{ alignItems: "stretch" }} // ensure children stretch to same row height
+                    >
                       {filteredAgents.map((agent) => (
-                        <Grid2 key={agent.name} size={{ xs: 12, sm: 6, md: 4, lg: 4, xl: 4 }} sx={{ display: "flex" }}>
+                        <Grid2
+                          key={agent.name}
+                          size={{ xs: 12, sm: 6, md: 4, lg: 4, xl: 4 }}
+                          sx={{ display: "flex" }}
+                        >
                           <Fade in timeout={500}>
-                            <Box>
+                            {/* Wrapper enforces a minimum card height and lets AgentCard fill it */}
+                            <Box
+                              sx={{
+                                width: "100%",
+
+                              }}
+                            >
                               <AgentCard
                                 agent={agent}
                                 onDelete={handleDeleteAgent}
                                 isFavorite={favoriteAgents.includes(agent.name)}
                                 onToggleFavorite={toggleFavorite}
-                                allAgents={agenticFlows}
+                                allAgents={agents}
                               />
                             </Box>
                           </Fade>

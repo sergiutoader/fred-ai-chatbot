@@ -10,7 +10,6 @@ import {
   Typography,
   alpha,
 } from "@mui/material";
-import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import LanIcon from "@mui/icons-material/Lan";
@@ -22,33 +21,65 @@ function safeFrontMatterFromContent(content?: unknown): Record<string, any> {
   if (typeof content !== "string") return {};
   const text = content.trim();
   if (!text) return {};
-  // YAML front-matter
+
+  // 1) YAML front-matter (--- ... \n---)
   if (text.startsWith("---")) {
     try {
       const { header } = splitFrontMatter(text);
-      return (header as Record<string, any>) ?? {};
-    } catch {
-      // ignore
-    }
+      if (header && typeof header === "object") return header as Record<string, any>;
+    } catch { /* ignore */ }
   }
-  // Pure YAML (no front-matter fences)
+
+  // Helper pour un parse "safe"
+  const tryLoad = (src: string) => {
+    try {
+      const obj = yaml.load(src);
+      return obj && typeof obj === "object" ? (obj as Record<string, any>) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  // 2) YAML “single doc”
   if (/^[\w-]+:/.test(text)) {
     try {
       const obj = yaml.load(text);
       if (obj && typeof obj === "object") return obj as Record<string, any>;
     } catch {
-      // ignore
+      // 3) Multi-doc probable → on prend le 1er doc (avant le premier séparateur)
+      const firstDoc = text.split(/\n---\s*\n/)[0] ?? "";
+      const objFirst = firstDoc ? tryLoad(firstDoc) : {};
+      if (Object.keys(objFirst).length) return objFirst;
+
+      // 4) Fallback ultime: charger tous les docs et choisir le plus pertinent
+      try {
+        const docs: any[] = [];
+        yaml.loadAll(text, (d) => docs.push(d));
+        const pick =
+          docs.find(
+            (d) =>
+              d &&
+              typeof d === "object" &&
+              (Array.isArray((d as any).servers) ||
+               Array.isArray((d as any).mcpServers) ||
+               Array.isArray((d as any).mcp_servers))
+          ) ||
+          docs.find((d) => d && typeof d === "object" && (d as any).kind) ||
+          docs[0];
+
+        if (pick && typeof pick === "object") return pick as Record<string, any>;
+      } catch { /* ignore */ }
     }
   }
-  // JSON
+
+  // 5) JSON
   if (text.startsWith("{")) {
     try {
       const obj = JSON.parse(text);
       if (obj && typeof obj === "object") return obj as Record<string, any>;
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }
+
   return {};
 }
 
@@ -109,14 +140,15 @@ function getAgentLabels(r: Resource): string[] {
 
 /** Ultra-tolerant MCP server extractor. */
 function getAgentMcpServers(r: Resource): Array<{ name?: string; url?: string }> {
-  // Try many shapes
+  // Cas où des UIs collent le tableau à la racine de la ressource
   const rootCandidates = [
     (r as any)?.mcpServers,
     (r as any)?.mcp_servers,
-    (r as any)?.servers, // some UIs stick it at root
+    (r as any)?.servers,
   ];
   for (const c of rootCandidates) if (Array.isArray(c)) return c;
 
+  // Sinon on lit le header (robuste multi-doc via safeFrontMatterFromContent)
   const h = readHeader(r);
   const headerCandidates = [
     h?.mcpServers,
@@ -137,12 +169,10 @@ function agentInitial(name: string) {
 
 export function AgentRowCard({
   resource,
-  onPreview,
   onEdit,
   onRemoveFromLibrary,
 }: {
   resource: Resource;
-  onPreview?: (p: Resource) => void;
   onEdit?: (p: Resource) => void;
   onRemoveFromLibrary?: (p: Resource) => void;
 }) {
@@ -219,14 +249,6 @@ export function AgentRowCard({
             color={mcpCount ? "success" : "default"}
           />
         </Tooltip>
-
-        {onPreview ? (
-          <Tooltip title="Preview">
-            <IconButton size="small" onClick={(e) => { e.stopPropagation(); onPreview(resource); }}>
-              <KeyboardArrowRightIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        ) : null}
         {onEdit ? (
           <Tooltip title="Edit">
             <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(resource); }}>
