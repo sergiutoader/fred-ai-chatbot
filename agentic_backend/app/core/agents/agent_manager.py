@@ -17,13 +17,20 @@ import importlib
 import logging
 from builtins import ExceptionGroup
 from inspect import iscoroutinefunction
-from typing import Callable, Dict, List, Type
+from typing import Callable, Dict, List, Type, Any, Optional
+import importlib
+import httpx
+import yaml
+from inspect import iscoroutinefunction
+from hashlib import sha256
+from app.common.structures import MCPServerConfiguration
+
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from tenacity import RetryError, retry, stop_after_delay, wait_fixed
 
 from app.agents.leader.leader import Leader
-from app.application_context import get_configuration
+from app.application_context import get_configuration, get_knowledge_flow_base_url
 from app.common.error import UnsupportedTransportError
 from app.common.structures import AgentSettings, Configuration
 from app.core.agents.agentic_flow import AgenticFlow
@@ -79,7 +86,306 @@ class AgentManager:
                     agent_cfg  # ✅ ensure failed ones are tracked
                 )
         await self._load_all_persisted_agents()
+        # NEW: load resource-backed agents
+        await self.load_dynamic_resource_agents(
+            base_url=get_knowledge_flow_base_url(),
+            type_to_class={"mcp": "app.core.agents.mcp_agent.MCPAgent"}  # put your real class
+        )
         self._inject_experts_into_leaders()
+        
+        
+    async def load_dynamic_resource_agents(
+        self,
+        base_url: str,
+        *,
+        headers: Optional[Dict[str, str]] = None,
+        bearer_token: Optional[str] = None,
+        timeout: float = 10.0,
+        verify_tls: bool = True,
+        replace_on_change: bool = True,
+        type_to_class: Optional[Dict[str, str]] = None,
+    ):
+        """
+        v1 loader with optional auth:
+        - If `bearer_token` is provided, sets Authorization: Bearer <token>.
+        - If `headers` is provided, merges them (takes precedence over bearer).
+        - If neither is provided, calls the endpoint without auth.
+        - `type_to_class` MUST be provided.
+        """
+        try:  # <- guard the whole loader so lifespan never explodes
+            if type_to_class is None:
+                logger.error(
+                    "[ResourceAgents] Missing type_to_class mapping. "
+                    "Pass e.g. type_to_class={'mcp': 'app.<your_module>.MCPAgent'}"
+                )
+                return
+            logger.debug("[ResourceAgents] type_to_class mapping: %s", type_to_class)
+
+            # Build headers
+            req_headers: Dict[str, str] = {}
+            if bearer_token:
+                req_headers["Authorization"] = f"Bearer {bearer_token}"
+            if headers:
+                req_headers.update(headers)
+
+            base = base_url.rstrip("/")
+            logger.debug(
+                "[ResourceAgents] start fetch base_url=%s path=/resources headers=%s bearer=%s",
+                base, bool(req_headers), bool(bearer_token),
+            )
+
+            # Fetch resources
+            async with httpx.AsyncClient(base_url=base, timeout=timeout, verify=verify_tls) as cli:
+                try:
+                    resp = await cli.get(
+                        "/resources",
+                        params={"kind": "agent"},
+                        headers=req_headers or None,
+                    )
+                    logger.debug("[ResourceAgents] GET /resources -> status=%s", resp.status_code)
+                    resp.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    logger.warning(f"[ResourceAgents] fetch failed: {e.response.status_code} {e.response.text}")
+                    return
+                resources: List[Dict[str, Any]] = resp.json() or []
+                logger.debug("[ResourceAgents] fetched %d resources", len(resources))
+
+            if not resources:
+                logger.warning("[ResourceAgents] no resources returned; check base_url/path/auth")
+                return
+
+            added, updated = 0, 0
+            for idx, res in enumerate(resources):
+                rid = res.get("id")
+                logger.debug(
+                    "[ResourceAgents] #%d id=%s name=%s updated_at=%s",
+                    idx, rid, res.get("name"), res.get("updated_at")
+                )
+                try:
+                    # Map Resource -> AgentSettings
+                    settings = self._resource_to_agent_settings_v1(res, type_to_class)
+                    logger.debug(
+                        "[ResourceAgents] mapped -> name=%s type=%s class_path=%s servers=%d prompt_len=%d",
+                        settings.name, settings.type, settings.class_path,
+                        len(settings.mcp_servers or []),
+                        len(settings.base_prompt or "") if settings.base_prompt else 0,
+                    )
+
+                    # Idempotency / replace-on-change
+                    existing = self.agent_settings.get(settings.name)
+                    if existing and not replace_on_change:
+                        logger.debug("[ResourceAgents] '%s' exists; replace_on_change=False -> skip", settings.name)
+                        continue
+
+                    if existing and replace_on_change:
+                        prev = (existing.settings or {}).get("_resource_updated_at")
+                        now = res.get("updated_at")
+                        if prev == now:
+                            logger.debug("[ResourceAgents] '%s' unchanged (updated_at=%s) -> skip", settings.name, now)
+                            continue
+                        logger.info("[ResourceAgents] '%s' changed (prev=%s, now=%s) -> recreate", settings.name, prev, now)
+                        self.unregister_agent(settings.name)
+
+                    # Import class and instantiate
+                    module_name, class_name = settings.class_path.rsplit(".", 1)
+                    logger.debug(
+                        "[ResourceAgents] importing class_path=%s (module=%s, class=%s)",
+                        settings.class_path, module_name, class_name
+                    )
+                    try:
+                        module = importlib.import_module(module_name)
+                        cls = getattr(module, class_name)
+                    except Exception:
+                        logger.exception(f"[ResourceAgents] import failed for class_path={settings.class_path}")
+                        # optional: try known fallbacks if you want
+                        continue
+
+                    if not issubclass(cls, AgentFlow):
+                        logger.error(f"[ResourceAgents] class {cls} is not AgentFlow; skip name={settings.name}")
+                        continue
+
+                    instance = cls(agent_settings=settings)
+
+                    # ⚠️ Critical: catch BaseException so GeneratorExit/anyio cancel scope doesn't kill lifespan
+                    if iscoroutinefunction(getattr(instance, "async_init", None)):
+                        try:
+                            await instance.async_init()
+                            logger.debug("[ResourceAgents] async_init OK for '%s'", settings.name)
+                        except BaseException as be:  # <-- broader than Exception
+                            logger.exception(
+                                "[ResourceAgents] async_init failed hard for '%s' (suppressed to keep startup alive)",
+                                settings.name
+                            )
+                            # skip registering this broken agent to keep the app healthy
+                            continue
+
+                    self.register_dynamic_agent(instance, settings)
+                    logger.info("[ResourceAgents] registered '%s' (nickname=%s)", settings.name, settings.nickname)
+
+                    if existing:
+                        updated += 1
+                    else:
+                        added += 1
+
+                except Exception:
+                    logger.exception("Failed to load resource agent", extra={"resource_id": res.get("id")})
+
+            if added or updated:
+                self._inject_experts_into_leaders()
+                logger.info(
+                    "Resource agents loaded (v1). added=%d, updated=%d. Enabled=%s",
+                    added, updated, ", ".join(sorted(self.get_enabled_agent_names()))
+                )
+            else:
+                logger.info(
+                    "Resource agents loaded (v1). nothing to add/update. Enabled=%s",
+                    ", ".join(sorted(self.get_enabled_agent_names()))
+                )
+        except BaseException as be:
+            # Final guard so FastAPI lifespan doesn't crash with "generator didn't yield"
+            logger.exception("[ResourceAgents] loader aborted by fatal error (suppressed): %s", be)
+            return
+
+    def _resource_to_agent_settings_v1(
+        self,
+        res: Dict[str, Any],
+        type_to_class: Dict[str, str],
+    ) -> AgentSettings:
+        """
+        Minimal v1 mapping:
+        - Parse YAML header from resource.content (front-matter before '---').
+        - Map fields to AgentSettings.
+        - Put only bookkeeping info in settings["_resource_updated_at"] (allowed).
+        """
+        rid = str(res.get("id"))
+        content = (res.get("content") or "").strip()
+        preview = (content[:160].replace("\n", "\\n") + ("…" if len(content) > 160 else ""))
+        logger.debug("[ResourceAgents] map id=%s content_preview=%s", rid, preview)
+
+        header, body = self._split_yaml_header(content)
+        logger.debug("[ResourceAgents] header_keys=%s body_len=%d", list(header.keys()), len(body or ""))
+
+        # name/description fallbacks
+        name = header.get("name") or res.get("name") or f"agent:{rid}"
+        description = header.get("description") or res.get("description") or name
+        nickname = header.get("nickname") or None
+        role = header.get("role") or "Dynamic Agent"
+        icon = header.get("icon") or "Robot"
+        labels = header.get("labels") or res.get("labels") or []
+        rtype = (header.get("type") or "mcp").lower()
+
+        class_path = header.get("class_path") or type_to_class.get(rtype)
+        logger.debug("[ResourceAgents] rtype=%s class_path=%s", rtype, class_path)
+        if not class_path:
+            raise ValueError(f"No class_path mapping for type='{rtype}'.")
+
+        mcp_servers = self._extract_mcp_servers_v1(header)
+        logger.debug("[ResourceAgents] servers_count=%d", len(mcp_servers or []))
+
+        # pick a default model from config (adapt to your config shape)
+        model_cfg = getattr(self.config.ai, "default_model", None) or getattr(self.config.ai, "model", None)
+        if not model_cfg:
+            models = getattr(self.config.ai, "models", None)
+            model_cfg = models[0] if models else None
+        if not model_cfg:
+            raise ValueError("No default model configuration available for dynamic resource agents.")
+        logger.debug("[ResourceAgents] model_cfg=%s", getattr(model_cfg, "model_id", None) or type(model_cfg).__name__)
+
+        # Only use fields that exist on AgentSettings
+        settings = AgentSettings(
+            type=rtype if rtype in ("mcp", "custom", "leader") else "custom",
+            name=name,
+            class_path=class_path,
+            enabled=True,
+            categories=list(labels),
+            settings={"_resource_updated_at": res.get("updated_at")},  # v1 change tracking
+            model=model_cfg,
+            tag="resource-agent",
+            mcp_servers=mcp_servers,
+            max_steps=10,
+            description=description,
+            base_prompt=body or None,
+            nickname=nickname,
+            role=role,
+            icon=icon,
+        )
+        logger.debug("[ResourceAgents] built AgentSettings name=%s", settings.name)
+        return settings
+
+    def _extract_mcp_servers_v1(self, header: Dict[str, Any]) -> List[MCPServerConfiguration]:
+        """Normalize to a typed list of MCPServerConfiguration (not plain dicts)."""
+        candidates = header.get("mcpServers") or header.get("mcp_servers") or header.get("servers") or []
+        if not isinstance(candidates, list):
+            candidates = [candidates]
+        logger.debug("[ResourceAgents] servers candidates len=%d", len(candidates))
+
+        out: List[MCPServerConfiguration] = []
+        for i, s in enumerate(candidates):
+            if not isinstance(s, dict):
+                logger.debug("[ResourceAgents] skip server[%d]: not a dict", i)
+                continue
+
+            # Normalize transport to your supported literals
+            transport = (s.get("transport") or "sse").lower()
+            if transport in ("ws", "websocket"):
+                transport = "websocket"
+            elif transport in ("http2", "h2"):
+                transport = "streamable_http"
+            elif transport == "stdio":
+                transport = "stdio"
+            else:
+                transport = "sse"
+
+            args_val = s.get("args")
+            if not isinstance(args_val, list):
+                args_val = None
+
+            env_val = s.get("env")
+            if not isinstance(env_val, dict):
+                env_val = None
+
+            cfg = MCPServerConfiguration(
+                name=str(s.get("name") or "MCP"),
+                url=str(s.get("url") or s.get("baseUrl") or ""),
+                transport=transport,                 # matches SUPPORTED_TRANSPORTS
+                sse_read_timeout=int(s.get("timeout") or s.get("sse_read_timeout") or 600),
+                command=s.get("command"),
+                args=args_val,                       # List[str] | None
+                env=env_val,                         # Dict[str, str] | None
+            )
+            logger.debug("[ResourceAgents] server[%d] name=%s url=%s transport=%s", i, cfg.name, cfg.url, cfg.transport)
+            out.append(cfg)
+        return out
+
+    
+    def _split_yaml_header(self, content: str) -> tuple[Dict[str, Any], str]:
+        """Front-matter support: YAML header then '---' then body; else treat all as YAML or body."""
+        if not content:
+            logger.debug("[ResourceAgents] empty content")
+            return {}, ""
+        sep = "\n---\n"
+        if sep in content:
+            header_text, body = content.split(sep, 1)
+            try:
+                header = yaml.safe_load(header_text) or {}
+                if not isinstance(header, dict):
+                    header = {}
+            except Exception as e:
+                logger.debug("[ResourceAgents] YAML front-matter parse failed: %s", e)
+                header = {}
+            logger.debug("[ResourceAgents] split front-matter: header_len=%d body_len=%d", len(header_text), len(body))
+            return header, body
+        try:
+            header = yaml.safe_load(content) or {}
+            if isinstance(header, dict):
+                logger.debug("[ResourceAgents] single-doc YAML header only (no body)")
+                return header, ""
+            logger.debug("[ResourceAgents] content is not YAML dict; using as body")
+            return {}, content
+        except Exception as e:
+            logger.debug("[ResourceAgents] YAML parse failed; treat as body. err=%s", e)
+            return {}, content
+
 
     async def _register_static_agent(self, agent_cfg: AgentSettings) -> bool:
         try:

@@ -135,7 +135,8 @@
       "oneRecording": "1 recording",
       "libraries": "Libraries ({{count}})",
       "prompts": "Prompts ({{count}})",
-      "templates": "Templates ({{count}})"
+      "templates": "Templates ({{count}})",
+      "agents": "Agents ({{count}})"
     }
   },
   "settings": {

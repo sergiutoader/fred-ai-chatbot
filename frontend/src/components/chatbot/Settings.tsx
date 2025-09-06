@@ -33,12 +33,17 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAgentBadge } from "../../utils/avatar.tsx";
 import React from "react";
 import { StyledMenu } from "../../utils/styledMenu.tsx";
 import { useTranslation } from "react-i18next";
 import { AgenticFlow, SessionSchema } from "../../slices/agentic/agenticOpenApi.ts";
+import yaml from "js-yaml";
+import {
+  Resource as KFResource,
+  useLazyListResourcesByKindKnowledgeFlowV1ResourcesGetQuery,
+} from "../../slices/knowledgeFlow/knowledgeFlowOpenApi.ts";
 
 export const Settings = ({
   sessions,
@@ -82,6 +87,90 @@ export const Settings = ({
   const [editText, setEditText] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [showElements, setShowElements] = useState(false);
+
+  // ---- minimal additions to show agent resources ----
+  const [mergedAgents, setMergedAgents] = useState<AgenticFlow[]>([]);
+  const [triggerListAgentResources] = useLazyListResourcesByKindKnowledgeFlowV1ResourcesGetQuery();
+
+  function parseHeaderFromContent(text?: string): Record<string, any> {
+    if (typeof text !== "string") return {};
+    const s = text.trim();
+    if (!s) return {};
+    if (s.startsWith("---")) {
+      const fm = s.slice(3).split(/\n---\s*\n/, 1)[0];
+      if (fm) {
+        try {
+          const h = yaml.load(fm);
+          if (h && typeof h === "object") return h as Record<string, any>;
+        } catch {}
+      }
+    }
+    const docs: any[] = [];
+    try {
+      yaml.loadAll(s, (d) => d && typeof d === "object" && docs.push(d));
+    } catch {
+      if (s.startsWith("{")) {
+        try {
+          const j = JSON.parse(s);
+          if (j && typeof j === "object") docs.push(j);
+        } catch {}
+      }
+    }
+    const pick =
+      docs.find((d) => d.kind) ||
+      docs.find((d) => Array.isArray(d.servers) || Array.isArray(d.mcpServers) || Array.isArray(d.mcp_servers)) ||
+      docs[0];
+    return pick && typeof pick === "object" ? (pick as Record<string, any>) : {};
+  }
+
+  function mapResourceAgentToFlow(r: KFResource): AgenticFlow | null {
+    const h = parseHeaderFromContent((r as any)?.content);
+    const pick = <T,>(...v: (T | undefined | null)[]) => v.find((x) => x !== undefined && x !== null);
+
+    const name = pick<string>((r as any)?.name, (r as any)?.metadata?.name, h?.name);
+    if (!name) return null;
+
+    const role = pick<string>((r as any)?.role, (r as any)?.metadata?.role, h?.role);
+    const nickname = pick<string>((r as any)?.nickname, (r as any)?.metadata?.nickname, h?.nickname);
+    const description = pick<string>((r as any)?.description, (r as any)?.metadata?.description, h?.description);
+    const icon = pick<string>((r as any)?.icon, (r as any)?.metadata?.icon, h?.icon);
+    const labels =
+      (pick<string[]>((r as any)?.labels, (r as any)?.metadata?.labels, h?.labels) ?? []) as string[];
+    const tag = Array.isArray(labels) && labels.length ? String(labels[0]) : undefined;
+
+    return {
+      name,
+      role,
+      nickname,
+      description,
+      icon,
+      experts: [],
+      tag,
+      tags: tag,
+    } as AgenticFlow;
+  }
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await triggerListAgentResources({ kind: "agent" }).unwrap();
+        const resourceAgents = (res as KFResource[])
+          .map(mapResourceAgentToFlow)
+          .filter(Boolean) as AgenticFlow[];
+        const map = new Map<string, AgenticFlow>();
+        resourceAgents.forEach((a) => a?.name && map.set(a.name, a));
+        (agenticFlows || []).forEach((a) => a?.name && map.set(a.name, a));
+        if (mounted) setMergedAgents(Array.from(map.values()));
+      } catch {
+        if (mounted) setMergedAgents(agenticFlows || []);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [agenticFlows, triggerListAgentResources]);
+  // ---------------------------------------------------
 
   // Gestion du menu chatProfileuel
   const openMenu = (event: React.MouseEvent<HTMLElement>, session: SessionSchema) => {
@@ -178,7 +267,7 @@ export const Settings = ({
        - Selected line uses a clear border + subtle bg.
     */}
               <List dense disablePadding>
-                {agenticFlows.map((flow) => {
+                {mergedAgents.map((flow) => {
                   const isSelected = flow.name === currentAgenticFlow.name;
 
                   // Tooltip content: nickname (title), then role + description

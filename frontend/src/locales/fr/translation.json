@@ -134,7 +134,9 @@
       "oneRecording": "1 enregistrement",
       "libraries": "Bibliothèques ({{count}})",
       "prompts": "Prompts ({{count}})",
-      "templates": "Templates ({{count}})"
+      "templates": "Templates ({{count}})",
+      "agents": "Agents ({{count}})",
+      "mcps": "Serveurs MCP ({{count}})"
     }
   },
   "settings": {

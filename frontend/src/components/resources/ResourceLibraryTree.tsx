@@ -252,7 +252,6 @@ export function ResourceLibraryTree({
                 {left}
                 <AgentRowCard
                   resource={r}
-                  onPreview={onPreview}
                   onEdit={onEdit}
                   onRemoveFromLibrary={tag && onRemoveFromLibrary ? (rr) => onRemoveFromLibrary(rr, tag) : undefined}
                 />
