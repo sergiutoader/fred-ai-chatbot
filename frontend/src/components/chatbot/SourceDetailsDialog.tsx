@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { VectorSearchHit } from "../../slices/agentic/agenticOpenApi";
-import { newUseDocumentViewer } from "../../common/newUseDocumentViewer";
+import { useDocumentViewer } from "../../common/useDocumentViewer";
 
 export function SourceDetailsDialog({
   open,
@@ -26,7 +26,7 @@ export function SourceDetailsDialog({
   documentId: string;
   hits: VectorSearchHit[];
 }) {
-  const { openDocument } = newUseDocumentViewer();
+  const { openDocument } = useDocumentViewer();
   if (!open) return null;
   if (!hits?.length) return null;
 

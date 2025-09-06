@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { useDrawer } from "../components/DrawerProvider";
-import NewDocumentViewer from "./NewDocumentViewer";
+import DocumentViewer from "./DocumentViewer";
 
 
 export interface NewDocumentViewerDocument {
@@ -28,13 +28,13 @@ export interface NewDocumentViewerOptions {
   chunksToHighlight?: string[];
 }
 
-export const newUseDocumentViewer = () => {
+export const useDocumentViewer = () => {
   const { openDrawer, closeDrawer } = useDrawer();
 
   const openDocument = (doc: NewDocumentViewerDocument, options?: NewDocumentViewerOptions) => {
     openDrawer({
       content: (
-        <NewDocumentViewer
+        <DocumentViewer
           document={doc}
           onClose={closeDrawer}
           highlightedParts={options?.highlightedParts}

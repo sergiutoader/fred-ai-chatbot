@@ -23,7 +23,7 @@ import {
 } from "../../../slices/knowledgeFlow/knowledgeFlowOpenApi";
 import { useToast } from "../../ToastProvider";
 import { useTranslation } from "react-i18next";
-import { newUseDocumentViewer } from "../../../common/newUseDocumentViewer";
+import { useDocumentViewer } from "../../../common/useDocumentViewer";
 import { downloadFile } from "../../../utils/downloadUtils";
 import { useLazyDownloadRawContentBlobQuery } from "../../../slices/knowledgeFlow/knowledgeFlowApi.blob";
 
@@ -41,7 +41,7 @@ export function useDocumentCommands({ refetchTags, refetchDocs }: DocumentRefres
   const [updateRetrievable] =
     useUpdateDocumentMetadataRetrievableKnowledgeFlowV1DocumentMetadataDocumentUidPutMutation();
   const [fetchAllDocuments] = useSearchDocumentMetadataKnowledgeFlowV1DocumentsMetadataSearchPostMutation();
-  const { openDocument } = newUseDocumentViewer();
+  const { openDocument } = useDocumentViewer();
   const [triggerDownloadBlob] = useLazyDownloadRawContentBlobQuery();
   const refresh = useCallback(async () => {
     await Promise.all([refetchTags?.(), refetchDocs ? refetchDocs() : fetchAllDocuments({ filters: {} })]);

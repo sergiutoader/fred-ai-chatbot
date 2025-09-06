@@ -6,7 +6,11 @@
   "resource": {
     "kind": {
       "prompt":   { "one": "prompt",   "other": "prompts" },
-      "template": { "one": "modèle", "other": "modèles" }
+      "template": { "one": "modèle", "other": "modèles" },
+      "document": { "one": "document", "other": "documents" },
+      "mcp":      { "one": "serveur MCP", "other": "serveurs MCP" },
+      "agent":    { "one": "agent",    "other": "agents" },
+      "model":    { "one": "modèle",    "other": "modèles" }
     }
   },
   "validation": {
@@ -227,7 +231,10 @@
        "templates": "Modèles",
       "prompts": "Prompts",
       "documents": "Documents",
-      "operations": "Opérations"
+      "operations": "Opérations",
+      "agents": "Agents",
+      "mcp": "Serveurs MCP",
+      "models": "Modèles"
     }
   },
   "documentLibrary": {
@@ -292,10 +299,10 @@
     "expandAll": "Tout développer",
     "folderDeleteSuccess": "Dossier supprimé",
     "folderDeleteDetail": "Le dossier « {{name}} » a été supprimé.",
-    "searchPlaceholder":"Rechercher un(e) {{typeOne}}",
-    "importDrawerTitle": "Importer un(e) {{typeOne}}",
+    "searchPlaceholder":"Rechercher un {{typeOne}}",
+    "importDrawerTitle": "Importer un {{typeOne}}",
     "dropFiles":"Deposez vos {{typePlural}} ici",
-    "noFiles": "Aucun(e) {{typeOne}} trouvé(e)",
+    "noFiles": "Aucun {{typeOne}} trouvé(e)",
     "import": "Importer"
 
   },

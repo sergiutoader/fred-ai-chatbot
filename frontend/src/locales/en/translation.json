@@ -7,7 +7,11 @@
   "resource": {
     "kind": {
       "prompt":   { "one": "prompt",   "other": "prompts" },
-      "template": { "one": "template", "other": "templates" }
+      "template": { "one": "template", "other": "templates" },
+      "document": { "one": "document", "other": "documents" },
+      "mcp":      { "one": "MCP server", "other": "MCP servers" },
+      "agent":    { "one": "agent",    "other": "agents" },
+      "model":    { "one": "model",    "other": "models"}
     }
   },
   "validation": {
@@ -226,7 +230,10 @@
       "templates": "Templates",
       "prompts": "Prompts",
       "documents": "Documents",
-      "operations": "Operations"
+      "operations": "Operations",
+      "agents": "Agents",
+      "mcp": "MCP Servers",
+      "models": "Models"
     }
   },
   "documentLibrary": {

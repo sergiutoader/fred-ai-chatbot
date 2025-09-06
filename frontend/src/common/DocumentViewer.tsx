@@ -31,7 +31,7 @@ const decodeMaybeBase64 = (s: string) => {
   }
 };
 
-export const NewDocumentViewer: React.FC<DocumentViewerProps> = ({
+export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   document: doc,
   onClose,
   highlightedParts = [],
@@ -127,4 +127,4 @@ export const NewDocumentViewer: React.FC<DocumentViewerProps> = ({
   );
 };
 
-export default NewDocumentViewer;
+export default DocumentViewer;

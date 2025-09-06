@@ -32,7 +32,6 @@ import {
 // OpenAPI slice (knowledge-flow)
 import {
   Resource as KFResource,
-  ResourceKind,
   useListResourcesByKindKnowledgeFlowV1ResourcesGetQuery,
 } from "../../slices/knowledgeFlow/knowledgeFlowOpenApi";
 
@@ -189,7 +188,7 @@ export const AgentEditorModal: React.FC<AgentEditorModalProps> = ({
     data: existingMcp = [],
     isFetching: loadingMcp,
   } = useListResourcesByKindKnowledgeFlowV1ResourcesGetQuery(
-    { kind: ResourceKind.Mcp },
+    { kind: "mcp" },
     { skip: !isOpen }
   );
 
