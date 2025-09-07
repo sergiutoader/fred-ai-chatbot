@@ -19,11 +19,17 @@ from pydantic import BaseModel, field_validator
 from fred_core import BaseModelWithId
 
 
+# app/features/tag/structure.py
+
+
 class TagType(str, Enum):
     DOCUMENT = "document"
     PROMPT = "prompt"
     TEMPLATE = "template"
+    POLICY = "policy"
+    TOOL_INSTRUCTION = "tool_instruction"
     AGENT = "agent"
+    AGENT_BINDING = "agent_binding"
     MCP = "mcp"
 
 

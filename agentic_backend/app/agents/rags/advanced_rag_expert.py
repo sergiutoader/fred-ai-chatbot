@@ -27,7 +27,7 @@ from app.agents.rags.structures import (
     RagGraphState,
     RephraseQueryOutput,
 )
-from app.common.vector_search_client import VectorSearchClient
+from app.common.kf_vector_search_client import VectorSearchClient
 from app.common.rags_utils import attach_sources_to_llm_response
 from app.core.agents.flow import AgentFlow
 from app.core.agents.runtime_context import get_document_libraries_ids
@@ -138,6 +138,14 @@ class AdvancedRagExpert(AgentFlow):
         self.search_client = VectorSearchClient()
         self.base_prompt = self._generate_prompt()
         self._graph = self._build_graph()
+
+    async def async_start(self, tg=None):
+        """No-op bring-up: RAG uses on-demand REST calls during reasoning."""
+        return None
+
+    async def aclose(self):
+        """No-op shutdown: nothing to close."""
+        return None
 
     # ---------- prompt ----------
 

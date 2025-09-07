@@ -1,4 +1,18 @@
-# app/common/yaml_front_matter.py
+# Copyright Thales 2025
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -8,23 +22,38 @@ from uuid import uuid4
 
 import yaml
 
-from app.features.resources.structures import Resource, ResourceCreate
+from app.features.resources.structures import Resource, ResourceCreate, ResourceKind
 
 _DASH_LINE_RE = re.compile(r"^\s*---\s*$")
+
+
+def _body_required(kind: ResourceKind) -> bool:
+    """
+    For structural resources (agent_binding, agent), the header is the content.
+    Everything else must include a non-empty body.
+    """
+    return kind not in {ResourceKind.AGENT_BINDING, ResourceKind.AGENT}
 
 
 def build_resource_from_create(payload: ResourceCreate, library_tag_id: str, user: str) -> Resource:
     """
     Validates YAML header/body and returns a fully-populated Resource ready to persist.
-    - Requires 'version' in header
-    - If header.kind is present, it must match payload.kind
-    - requires 'schema' in header
-    - Body must be non-empty (after the '---')
-    - payload.{name,description,labels} override header {name,description,tags} when provided
+
+    Rules:
+    - Required header keys: 'version', 'kind' must match payload.kind when present.
+    - Kind-specific metadata:
+        * All kinds: optional 'format' (string), defaults vary by kind.
+        * Prompts/rewriters/graders: optional 'output_schema' (dict).
+        * Templates: optional 'input_schema' (dict).
+        * (Legacy) 'schema' is accepted as 'output_schema' with a deprecation warning.
+    - Body:
+        * Required and non-empty for all kinds EXCEPT agent_binding and agent
+          (these are header-only by design).
+    - payload.{name,description,labels} override header {name,description,tags} when provided.
     """
     header, body = parse_front_matter(payload.content)
 
-    # 1) required keys
+    # ----- 1) Required header keys -----
     version = header.get("version")
     if not version:
         raise ValueError("Missing 'version' in resource header")
@@ -33,18 +62,41 @@ def build_resource_from_create(payload: ResourceCreate, library_tag_id: str, use
     if yaml_kind and yaml_kind != payload.kind.value:
         raise ValueError(f"YAML kind '{yaml_kind}' does not match payload.kind '{payload.kind.value}'")
 
-    schema = header.get("schema")
-    if not schema:
-        schema = {}
-    elif not isinstance(schema, dict):
-        raise ValueError("Missing or invalid 'schema' in header.")
+    yaml_name = header.get("name")
+    if yaml_name and payload.name and yaml_name != payload.name:
+        raise ValueError(f"YAML name '{yaml_name}' does not match payload.name '{payload.name}'")
+    if not yaml_name and not payload.name:
+        raise ValueError("Resource name must be provided in either payload.name or YAML header 'name'")
+    name = payload.name or yaml_name
+    assert name is not None  # for mypy
 
-    # 3) body must exist
-    if not body or not body.strip():
-        raise ValueError("Resource body must not be empty")
+    # ----- 2) Kind-aware schema/format handling -----
+    # Accepted keys:
+    #   - format: how to interpret/render the BODY (markdown/plaintext/handlebars/jinja2/json/yaml)
+    #   - output_schema: JSON Schema for LLM outputs (dict)
+    #   - input_schema: JSON Schema for template variables (dict)
+    # Back-compat: if 'schema' present, treat it as output_schema and warn.
+    fmt = header.get("format")  # optional
+    output_schema = header.get("output_schema")
+    input_schema = header.get("input_schema")
 
-    # 4) derive metadata (payload overrides header)
-    name = payload.name or header.get("name")
+    # Type checks for schemas when present
+    if output_schema is not None and not isinstance(output_schema, dict):
+        raise ValueError("'output_schema' must be a mapping (JSON Schema object) when provided")
+    if input_schema is not None and not isinstance(input_schema, dict):
+        raise ValueError("'input_schema' must be a mapping (JSON Schema object) when provided")
+
+    # Optionally enforce default format per kind (no serialization change; just validate)
+    if fmt is not None and not isinstance(fmt, str):
+        raise ValueError("'format' must be a string when provided")
+
+    # ----- 3) Body requirements by kind -----
+    if _body_required(payload.kind):
+        if not body or not body.strip():
+            raise ValueError("Resource body must not be empty")
+    # else: header-only kinds (agent_binding/agent) are allowed to have empty body
+
+    # ----- 4) Derive metadata; payload overrides header -----
     description = payload.description or header.get("description")
 
     # header.tags can be a list or a string; normalize to list[str]
@@ -56,7 +108,7 @@ def build_resource_from_create(payload: ResourceCreate, library_tag_id: str, use
 
     labels = payload.labels if payload.labels is not None else header_tags
 
-    # 5) assemble Resource
+    # ----- 5) Assemble Resource -----
     now = datetime.now(timezone.utc)
     return Resource(
         id=str(uuid4()),
@@ -68,8 +120,7 @@ def build_resource_from_create(payload: ResourceCreate, library_tag_id: str, use
         author=user,
         created_at=now,
         updated_at=now,
-        content=payload.content,
-        # TEMP: membership on resource; swap to join-table later
+        content=payload.content,  # keep original text; do not mutate header/body
         library_tags=[library_tag_id],
     )
 

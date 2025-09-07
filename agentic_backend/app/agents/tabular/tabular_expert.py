@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from anyio.abc import TaskGroup
 
 from app.common.mcp_runtime import MCPRuntime
 from app.common.resilient_tool_node import make_resilient_tools_node
@@ -49,17 +50,37 @@ class TabularExpert(AgentFlow):
         super().__init__(agent_settings=agent_settings)
         self.mcp = MCPRuntime(
             agent_settings=agent_settings,
-            # If you expose runtime filtering (tenant/library/time window),
-            # pass a provider: lambda: self.get_runtime_context()
             context_provider=(lambda: self.get_runtime_context()),
         )
         self.base_prompt = self._generate_prompt()
 
     async def async_init(self):
+        """Build model and graph WITHOUT dialing MCP (app can start if KF is down)."""
         self.model = get_model(self.agent_settings.model)
-        await self.mcp.init()
-        self.model = self.model.bind_tools(self.mcp.get_tools())
         self._graph = self._build_graph()
+
+    async def async_start(self, tg: TaskGroup) -> None:
+        """Background bring-up: connect MCP once and eagerly bind tools."""
+
+        async def _bringup():
+            try:
+                await self.mcp.init()  # one connect only
+                # Eager first bind; later refreshes will rebind via the tools node.
+                self.model = self.model.bind_tools(self.mcp.get_tools())
+                logger.info("%s: MCP bring-up complete; tools bound.", self.name)
+            except Exception:
+                # Non-fatal: first tool use can refresh_and_bind via resilient node.
+                logger.info(
+                    "%s: MCP bring-up skipped (Knowledge-Flow unavailable); will refresh on demand.",
+                    self.name,
+                    exc_info=True,
+                )
+
+        tg.start_soon(_bringup)
+
+    async def aclose(self):
+        """Clean shutdown: close MCP client/transports."""
+        await self.mcp.aclose()
 
     def _generate_prompt(self) -> str:
         return (

@@ -112,11 +112,11 @@ class ResourceController:
             summary="Get a resource by id.",
         )
         async def get_resource(
-            resource_id: str,
+            id: str,
             user: KeycloakUser = Depends(get_current_user),
         ) -> Resource:
             try:
-                return self.service.get(resource_id=resource_id, user=user)
+                return self.service.get(id=id, user=user)
             except Exception as e:
                 raise handle_exception(e)
 

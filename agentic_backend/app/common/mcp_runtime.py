@@ -123,7 +123,6 @@ logger = logging.getLogger(__name__)
 
 async def _close_mcp_client_quietly(client: Optional[MultiServerMCPClient]) -> None:
     """Best-effort, no-raise shutdown for a `MultiServerMCPClient`.
-
     Order of preference:
       1) `client.aclose()`  (async, public API)
       2) `client.close()`   (sync, public API)
@@ -140,26 +139,38 @@ async def _close_mcp_client_quietly(client: Optional[MultiServerMCPClient]) -> N
     if not client:
         return
 
+    # Why shield? streamable_http uses an internal anyio cancel scope; if the outer task
+    # group is cancelling concurrently, closing may raise CancelledError or a secondary
+    # "Attempted to exit a cancel scope..." RuntimeError. These are harmless.
+    Cancelled = anyio.get_cancelled_exc_class()
     try:
-        # 1) Public async close
-        aclose = getattr(client, "aclose", None)
-        if callable(aclose):
-            res = aclose()
-            if inspect.isawaitable(res):
-                await res
-            return
+        with anyio.CancelScope(shield=True):
+            # 1) Public async close
+            aclose = getattr(client, "aclose", None)
+            if callable(aclose):
+                res = aclose()
+                if inspect.isawaitable(res):
+                    await res
+                return
 
-        # 2) Public sync close
-        close = getattr(client, "close", None)
-        if callable(close):
-            close()
-            return
+            # 2) Public sync close
+            close = getattr(client, "close", None)
+            if callable(close):
+                close()
+                return
 
-        # 3) Internal safety net
-        exit_stack = getattr(client, "exit_stack", None)
-        if isinstance(exit_stack, AsyncExitStack):
-            await exit_stack.aclose()
+            # 3) Internal safety net
+            exit_stack = getattr(client, "exit_stack", None)
+            if isinstance(exit_stack, AsyncExitStack):
+                await exit_stack.aclose()
 
+    except Cancelled:
+        logger.info("[MCP] old client close ignored (cancelled during close).")
+    except RuntimeError as re:
+        if "cancel scope" in str(re):
+            logger.info("[MCP] old client close ignored (cancel-scope exit ordering).")
+        else:
+            logger.info("[MCP] old client close ignored.", exc_info=True)
     except Exception:
         logger.info("[MCP] old client close ignored.", exc_info=True)
 

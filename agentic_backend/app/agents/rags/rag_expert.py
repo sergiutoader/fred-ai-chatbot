@@ -21,7 +21,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, MessagesState, StateGraph
 
 from fred_core import VectorSearchHit
-from app.common.vector_search_client import VectorSearchClient
+from app.common.kf_vector_search_client import VectorSearchClient
 from app.common.rags_utils import (
     attach_sources_to_llm_response,
     ensure_ranks,
@@ -67,13 +67,23 @@ class RagExpert(AgentFlow):
 
     def __init__(self, agent_settings: AgentSettings):
         super().__init__(agent_settings=agent_settings)
+        # Pure construction; no network.
+
+        self.base_prompt = rag_preamble(self.current_date)
 
     async def async_init(self):
-        self.model = get_model(self.agent_settings.model)
+        """Build model and graph WITHOUT dialing remote services."""
         self.search_client = VectorSearchClient()
-        # Use shared preamble util
-        self.base_prompt = rag_preamble(self.current_date)
+        self.model = get_model(self.agent_settings.model)
         self._graph = self._build_graph()
+
+    async def async_start(self, tg=None):
+        """No-op bring-up: RAG uses on-demand REST calls during reasoning."""
+        return None
+
+    async def aclose(self):
+        """No-op shutdown: nothing to close."""
+        return None
 
     def _build_graph(self) -> StateGraph:
         builder = StateGraph(MessagesState)

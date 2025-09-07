@@ -115,14 +115,14 @@ class DuckdbResourceStore(BaseResourceStore):
             ).fetchall()
         return [self._deserialize(r) for r in rows]
 
-    def get_resource_by_id(self, resource_id: str) -> Resource:
+    def get_resource_by_id(self, id: str) -> Resource:
         with self.store._connect() as conn:
             row = conn.execute(
                 f"SELECT * FROM {self._table()} WHERE id = ?",
-                [resource_id],
+                [id],
             ).fetchone()
         if not row:
-            raise ResourceNotFoundError(f"No resource with ID {resource_id}")
+            raise ResourceNotFoundError(f"No resource with ID {id}")
         return self._deserialize(row)
 
     def create_resource(self, resource: Resource) -> Resource:

@@ -18,6 +18,7 @@ from fred_core.security.keycloak import (
     split_realm_url,
     initialize_keycloak,
 )
+from fred_core.security.system_actor import get_system_actor
 from fred_core.security.structure import (
     KeycloakUser,
     SecurityConfiguration,
@@ -59,7 +60,12 @@ from fred_core.security.backend_to_backend_auth import (
     make_b2b_asgi_client,
 )
 from fred_core.kpi.log_kpi_store import KpiLogStore
-
+from fred_core.common.bootstrap_resources import (
+    DEFAULT_CATALOG,
+     ResourceItem,
+     AgentBinding,
+     Kind
+)   
 __all__ = [
     "raise_internal_error",
     "get_current_user",
@@ -97,4 +103,9 @@ __all__ = [
     "B2BBearerAuth",
     "make_b2b_asgi_client",
     "split_realm_url",
+    "DEFAULT_CATALOG",
+    "ResourceItem",
+    "AgentBinding",
+    "Kind",
+    "get_system_actor",
 ]

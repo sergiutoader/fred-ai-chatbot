@@ -24,6 +24,7 @@ import os
 from rich.logging import RichHandler
 from dotenv import load_dotenv
 
+from app.application_bootstrap import bootstrap_fred_core
 from app.application_state import attach_app
 from app.common.http_logging import RequestResponseLogger
 from app.features.catalog.controller import CatalogController
@@ -87,6 +88,11 @@ def create_app() -> FastAPI:
     logger.info(f"🛠️ create_app() called with base_url={base_url}")
 
     ApplicationContext(configuration)
+    try:
+        summary = bootstrap_fred_core()
+        logger.info("🌱 fred-core bootstrap summary: %s", summary)
+    except Exception:
+        logger.exception("fred-core bootstrap failed (non-fatal). Continuing startup.")
 
     initialize_keycloak(configuration.app.security)
 

@@ -47,7 +47,7 @@ class BaseResourceStore(ABC):
         pass
 
     @abstractmethod
-    def get_resource_by_id(self, resource_id: str) -> Resource:
+    def get_resource_by_id(self, id: str) -> Resource:
         pass
 
     @abstractmethod

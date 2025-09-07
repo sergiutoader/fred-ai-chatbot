@@ -23,7 +23,7 @@ class ResourceService:
     def create(self, *, library_tag_id: str, payload: ResourceCreate, user) -> Resource:
         resource = build_resource_from_create(payload, library_tag_id, user.username)
         res = self._resource_store.create_resource(resource=resource)
-        logger.info(f"[RESOURCES] Created resource {res.id} of kind {res.kind} for user {user.username}")
+        logger.info(f"[RESOURCES] Created resource {res.name} of kind {res.kind} for user {user.username}")
         return res
 
     def update(self, *, resource_id: str, payload: ResourceUpdate, user) -> Resource:
@@ -36,8 +36,8 @@ class ResourceService:
         updated = self._resource_store.update_resource(resource_id=resource_id, resource=res)
         return updated
 
-    def get(self, *, resource_id: str, user) -> Resource:
-        return self._resource_store.get_resource_by_id(resource_id)
+    def get(self, *, id: str, user) -> Resource:
+        return self._resource_store.get_resource_by_id(id)
 
     def list_resources_by_kind(self, *, kind: ResourceKind) -> list[Resource]:
         return self._resource_store.get_all_resources(kind=kind)

@@ -19,6 +19,7 @@ from app.common.resilient_tool_node import make_resilient_tools_node
 from app.common.structures import AgentSettings
 from app.core.agents.flow import AgentFlow
 from app.core.model.model_factory import get_model
+from anyio.abc import TaskGroup
 
 from langgraph.constants import START
 from langgraph.graph import MessagesState, StateGraph
@@ -53,10 +54,28 @@ class ContentGeneratorExpert(AgentFlow):
         self.base_prompt = self._generate_prompt()
 
     async def async_init(self):
+        """Build model and graph WITHOUT dialing MCP (app can start if KF is down)."""
         self.model = get_model(self.agent_settings.model)
-        await self.mcp.init()
-        self.model = self.model.bind_tools(self.mcp.get_tools())
         self._graph = self._build_graph()
+
+    async def async_start(self, tg: TaskGroup) -> None:
+        """Background bring-up: connect MCP once and eagerly bind tools."""
+
+        async def _bringup():
+            try:
+                await self.mcp.init()  # one connect only
+                # Eager first bind; later refreshes will rebind via the tools node.
+                self.model = self.model.bind_tools(self.mcp.get_tools())
+                logger.info("%s: MCP bring-up complete; tools bound.", self.name)
+            except Exception:
+                # Non-fatal: first tool use can refresh_and_bind via resilient node.
+                logger.info(
+                    "%s: MCP bring-up skipped (Knowledge-Flow unavailable); will refresh on demand.",
+                    self.name,
+                    exc_info=True,
+                )
+
+        tg.start_soon(_bringup)
 
     def _generate_prompt(self) -> str:
         return (

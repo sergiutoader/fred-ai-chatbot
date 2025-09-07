@@ -19,10 +19,11 @@
 Entrypoint for the Agentic Backend App.
 """
 
-import asyncio
 from contextlib import asynccontextmanager
 import logging
 import os
+
+import anyio
 
 from app.core.agents.agent_manager import AgentManager
 from app.core.chatbot.session_orchestrator import SessionOrchestrator
@@ -92,19 +93,32 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        try:
-            await agent_manager.load_agents()
-            agent_manager.start_retry_loop()
-            logger.info("🚀 AgentManager fully loaded.")
-            yield
-        except asyncio.CancelledError as e:
-            logger.warning(
-                "🧯 Lifespan CancelledError caught (expected on shutdown): %r", e
-            )
-            # IMPORTANT: do NOT re-raise; cancellation is a control signal.
-            # Swallowing it here prevents the noisy traceback you observed.
-        finally:
-            logger.info("🧹 Lifespan exit.")
+        """
+        Fred lifespan: one TaskGroup owns all background work (connectors, retries).
+        - Startup runs before the single `yield`.
+        - Shutdown happens from the SAME task that created resources.
+        - No shields, no manual __aenter__/__aexit__, no cross-task scope exits.
+        """
+        logger.info("🚀 Lifespan enter.")
+        async with anyio.create_task_group() as tg:
+            app.state.tg = tg
+            # --- startup (fail fast if something truly breaks) ---
+            await agent_manager.load_agents(tg=tg)
+            agent_manager.start_retry_loop(tg=tg)
+            logger.info("✅ AgentManager fully loaded.")
+
+            # --- the one and only yield: hand control to the server ---
+            try:
+                yield
+            finally:
+                logger.info("🧹 Lifespan exit: orderly shutdown.")
+                # Close children (agents) from THIS task
+                try:
+                    await agent_manager.aclose()
+                except Exception:
+                    logger.exception("agent_manager.aclose() failed (ignored).")
+                # Exiting the 'async with' will cancel/await all TG children
+        logger.info("✅ Shutdown complete.")
 
     app = FastAPI(
         docs_url=f"{base_url}/docs",

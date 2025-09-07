@@ -75,16 +75,16 @@ class OpenSearchResourceStore(BaseResourceStore):
             logger.error(f"[RESOURCES] Failed to list {kind}s: {e}")
             raise
 
-    def get_resource_by_id(self, resource_id: str) -> Resource:
-        if cached := self._cache.get(resource_id):
+    def get_resource_by_id(self, id: str) -> Resource:
+        if cached := self._cache.get(id):
             return cached
         try:
-            doc = self.client.get(index=self.index_name, id=resource_id)
+            doc = self.client.get(index=self.index_name, id=id)
             return Resource(**doc["_source"])
         except NotFoundError:
-            raise ResourceNotFoundError(f"resource '{resource_id}' not found.")
+            raise ResourceNotFoundError(f"resource '{id}' not found.")
         except Exception as e:
-            logger.error(f"[RESOURCES] Failed to get resource '{resource_id}': {e}")
+            logger.error(f"[RESOURCES] Failed to get resource '{id}': {e}")
             raise
 
     def create_resource(self, resource: Resource) -> Resource:

@@ -1,0 +1,9 @@
+key: advanced_rag
+kind: agent_binding
+version: v1
+system_prompt_id: agent.system/advanced_rag
+node_overrides:
+  - node_key: grade_documents
+    prompt_id: node.system/grade_documents.permissive
+    policies: [policy.json/strict]
+---

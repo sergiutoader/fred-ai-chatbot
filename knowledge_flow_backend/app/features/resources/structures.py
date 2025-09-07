@@ -21,13 +21,28 @@ from fred_core import BaseModelWithId
 
 
 class ResourceKind(str, Enum):
+    """
+    Resource kinds supported in fred-core. A resource is a piece of content
+    such as a prompt, template, policy, tool instruction, or agent binding.
+    They are encoded using a flexible YAML front-matter + body format.
+
+    Note: some kinds (agent_binding, agent) are structural and do not require a body.
+    """
+
     PROMPT = "prompt"
     TEMPLATE = "template"
+    POLICY = "policy"
+    TOOL_INSTRUCTION = "tool_instruction"
     AGENT = "agent"
+    AGENT_BINDING = "agent_binding"
     MCP = "mcp"
 
 
 class ResourceUpdate(BaseModel):
+    """
+    Schema for updating an existing resource.
+    """
+
     content: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
@@ -35,6 +50,12 @@ class ResourceUpdate(BaseModel):
 
 
 class ResourceCreate(BaseModel):
+    """
+    Schema for creating a new resource.
+    The 'content' field must include YAML front-matter with at least 'version', 'kind', name,
+    input_schema and output_schema as applicable, and the body if required by kind.
+    """
+
     kind: ResourceKind
     content: str
     name: Optional[str] = None
@@ -43,10 +64,14 @@ class ResourceCreate(BaseModel):
 
 
 class Resource(BaseModelWithId):
-    id: str
+    """
+    Full representation of a Resource as stored in the system.
+    The 'content' field includes the full YAML front-matter + body.
+    """
+
     kind: ResourceKind
     version: str
-    name: Optional[str] = None
+    name: str
     description: Optional[str] = None
     labels: Optional[List[str]] = None
     author: str

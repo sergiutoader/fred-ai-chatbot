@@ -1,18 +1,6 @@
+# app/agents/sentinel/sentinel_expert.py
 # Copyright Thales 2025
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# app/agents/sentinel/sentinel.py
+# Licensed under the Apache License, Version 2.0
 
 import json
 import logging
@@ -25,7 +13,6 @@ from langgraph.prebuilt import tools_condition
 from pydantic import TypeAdapter
 
 from app.common.mcp_runtime import MCPRuntime
-
 from app.common.resilient_tool_node import make_resilient_tools_node
 from app.common.structures import AgentSettings
 from app.core.agents.flow import AgentFlow
@@ -36,108 +23,116 @@ logger = logging.getLogger(__name__)
 
 class SentinelExpert(AgentFlow):
     """
-    Sentinel — Ops & Monitoring agent (OpenSearch + KPIs).
+    Sentinel — Ops & Monitoring (OpenSearch + KPIs).
 
-    Design goals:
-    - Keep the agent focused on reasoning/presentation.
-    - Push all MCP client/tool refresh logic into MCPRuntime.
-    - Use a resilient ToolNode so transient 401/stream issues turn into
-      structured ToolMessages (not hard failures), then refresh MCP and continue.
+    Fred intent (lifecycle):
+    - __init__:    *pure construction* (no I/O). Compose MCPRuntime & config only.
+    - async_init:  build model + graph *without* dialing MCP so app can start even
+                   if Knowledge-Flow is down.
+    - async_start: background-connect MCP and eagerly bind tools once available.
+                   Failure is logged but non-fatal; the tools node can refresh/rebind
+                   on demand during the first tool use (e.g., after a 401/timeout).
+    - aclose:      structured shutdown (close MCP client & transports cleanly).
+
+    Why this split?
+    - Keeps startup fast and robust to remote outages.
+    - Ensures tool binding happens *once* at bring-up, while preserving the ability
+      to rebind later via the resilient tools node.
     """
 
-    # Class-level metadata
+    # ---- Public metadata (shows up in UI/registry) ---------------------------------
     name: str = "SentinelExpert"
     nickname: str = "Samy"
     role: str = "Ops & Monitoring Expert"
-    description: str = "Watches your instance, providing real-time monitoring and alerts for performance issues."
+    description: str = "Watches your instance and surfaces OpenSearch health & KPIs with actionable guidance."
     icon: str = "ops_agent"
     categories: list[str] = []
     tag: str = "ops"
 
+    # ---- Lifecycle (API contract) ---------------------------------------------------
     def __init__(self, agent_settings: AgentSettings):
+        """
+        Construction-only: set fields; do not connect to MCP here.
+
+        Why no I/O here?
+        - __init__ must be cheap and deterministic (used by registries/DI).
+        - Remote dependencies are started later under a task group for proper ownership.
+        """
         super().__init__(agent_settings=agent_settings)
         self.mcp = MCPRuntime(
             agent_settings=self.agent_settings,
-            # If you expose runtime filtering (tenant/library/time window),
-            # pass a provider: lambda: self.get_runtime_context()
+            # If you add tenant/time filters later, pass a context provider.
+            # Rationale: ContextAwareTool inspects schema and injects 'tags' only
+            # when supported. Keeping this lazy prevents surprising the LLM.
             context_provider=(lambda: self.get_runtime_context()),
         )
-        # Generic adapter that tolerates list/dict tool payloads (we won't enforce a single schema)
+        # Tolerant adapter for varied tool payload shapes in ToolMessages.
         self._any_list_adapter: TypeAdapter[List[Any]] = TypeAdapter(List[Any])
 
     async def async_init(self):
-        # LLM
+        """
+        Build model and graph WITHOUT dialing MCP.
+        Rationale: let app start cleanly even if Knowledge-Flow is down.
+        - The tools node is wired with a refresh callback; the first tool use can
+          (re)bind tools on demand if bring-up hasn't happened yet.
+        """
         self.model = get_model(self.agent_settings.model)
-        await self.mcp.init()
-        self.model = self.model.bind_tools(self.mcp.get_tools())
+        # Do not bind tools yet; tools may not exist if MCP is offline.
         self._graph = self._build_graph()
 
+    async def async_start(self, tg):
+        """
+        Bring MCP up in the background and bind tools once.
+
+        Why background (tg.start_soon)?
+        - Do not block app readiness on remote services.
+        - Keep the task under the app's task group (structured concurrency): if the
+          app shuts down or errors, this child is cancelled automatically.
+
+        Why bind_tools here?
+        - Eager first bind improves first-use latency.
+        - Later, the resilient tools node may refresh MCP and we rebind again as needed.
+        """
+
+        async def _bringup():
+            try:
+                await self.mcp.init()  # one connect only
+                self.model = self.model.bind_tools(self.mcp.get_tools())
+                logger.info("%s: MCP bring-up complete; tools bound.", self.name)
+            except Exception:
+                logger.info(
+                    "%s: MCP bring-up skipped (KF unavailable); will refresh on demand.",
+                    self.name,
+                    exc_info=True,
+                )
+
+        tg.start_soon(_bringup)
+
     async def aclose(self):
-        # Let AgentManager call this on shutdown if it supports it.
+        """
+        Clean shutdown hook. Called by AgentManager/Supervisor from the SAME task.
+        """
         await self.mcp.aclose()
 
-    def _generate_prompt(self) -> str:
-        return (
-            "You are Sentinel, an operations and monitoring agent for the Fred platform.\n"
-            "Use the available MCP tools to inspect OpenSearch health and application KPIs.\n"
-            "- Use os.* tools for cluster status, shards, indices, mappings, and diagnostics.\n"
-            "- Use kpi.* tools for usage, cost, latency, and error rates.\n"
-            "Return clear, actionable summaries. If something is degraded, propose concrete next steps.\n"
-            "When you reference data from tools, add short bracketed markers like [os_health], [kpi_query].\n"
-            "Prefer structured answers with bullets and short tables when helpful.\n"
-            f"Current date: {self.current_date}.\n"
-        )
-
-    def _build_graph(self) -> StateGraph:
-        if self.mcp.toolkit is None:
-            raise RuntimeError("Toolkit must be initialized before building graph")
-
-        builder = StateGraph(MessagesState)
-        builder.add_node("reasoner", self.reasoner)
-
-        async def _refresh_and_rebind():
-            # Refresh MCP (new client + toolkit) and rebind tools into the model.
-            # MCPRuntime handles snapshot logging + safe old-client close.
-            self.model = await self.mcp.refresh_and_bind(self.model)
-
-        tools_node = make_resilient_tools_node(
-            get_tools=self.mcp.get_tools,  # always returns the latest tool instances
-            refresh_cb=_refresh_and_rebind,  # on timeout/401/stream close, refresh + rebind
-        )
-
-        builder.add_node("tools", tools_node)
-        builder.add_edge(START, "reasoner")
-        builder.add_conditional_edges("reasoner", tools_condition)
-        builder.add_edge("tools", "reasoner")
-        return builder
-
+    # ---- Execution ------------------------------------------------------------------
     async def reasoner(self, state: MessagesState):
         """
-        One LLM step; may call tools (kpi.* or os.*). After tools run, we collect their
-        outputs (JSON/objects) from ToolMessages and attach to response metadata for the UI.
-
-        Fred rationale:
-        - Run MCP preflight *before* the LLM decides to call tools. This ensures the
-          underlying httpx Auth minted a fresh token (client-credentials) for this turn.
-        - Preflight should be cheap and non-fatal: if it fails, we log and keep going.
+        One LLM step; may call tools (kpi.* / os.*).
+        After tools run, collect ToolMessages and attach normalized payloads to response metadata.
         """
         if self.model is None:
             raise RuntimeError(
                 "Model is not initialized. Did you forget to call async_init()?"
             )
 
-        # if self.toolkit is not None:
-        #     await self._preflight_mcp(timeout_seconds=2.0)
-
         try:
             response = self.model.invoke([self.base_prompt] + state["messages"])
 
-            # Collect tool outputs by tool name, keep last result per tool call
+            # Collect last payload per tool call
             tool_payloads: Dict[str, Any] = {}
             for msg in state["messages"]:
                 if isinstance(msg, ToolMessage) and getattr(msg, "name", ""):
                     raw = msg.content
-                    # Normalize content: accept list/dict directly, else try JSON parse
                     normalized = raw
                     if isinstance(raw, str):
                         try:
@@ -164,3 +159,42 @@ class SentinelExpert(AgentFlow):
                 ]
             )
             return {"messages": [fallback]}
+
+    # ---- Private helpers -------------------------------------------------------------
+    def _generate_prompt(self) -> str:
+        return (
+            "You are Sentinel, an operations and monitoring agent for the Fred platform.\n"
+            "Use the available MCP tools to inspect OpenSearch health and KPIs.\n"
+            "- Use os.* tools for cluster status, shards, indices, mappings, diagnostics.\n"
+            "- Use kpi.* tools for usage, cost, latency, error rates.\n"
+            "Return clear, actionable summaries with next steps when degraded.\n"
+            "Add short markers like [os_health], [kpi_query] near tool-sourced facts.\n"
+            "Prefer concise bullets and short tables when helpful.\n"
+            f"Current date: {self.current_date}.\n"
+        )
+
+    def _build_graph(self) -> StateGraph:
+        """
+        Build the graph even if MCP tools are not ready.
+        The tools node uses a refresh callback that:
+          - refreshes MCP client/toolkit
+          - rebinds tools into the model
+        so first tool use (or async_start) will make tools available.
+        """
+        builder = StateGraph(MessagesState)
+        builder.add_node("reasoner", self.reasoner)
+
+        async def _refresh_and_rebind():
+            self.model = await self.mcp.refresh_and_bind(self.model)
+
+        # get_tools() may return [] if MCP not yet initialized; the resilient node handles that.
+        tools_node = make_resilient_tools_node(
+            get_tools=self.mcp.get_tools,
+            refresh_cb=_refresh_and_rebind,
+        )
+
+        builder.add_node("tools", tools_node)
+        builder.add_edge(START, "reasoner")
+        builder.add_conditional_edges("reasoner", tools_condition)
+        builder.add_edge("tools", "reasoner")
+        return builder

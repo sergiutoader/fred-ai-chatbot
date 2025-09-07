@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Copyright Thales 2025
 from datetime import datetime
 import logging
 from typing import Optional, Iterable
@@ -39,8 +38,14 @@ def _tagtype_to_rk(tag_type: TagType) -> ResourceKind:
         return ResourceKind.PROMPT
     if tag_type == TagType.TEMPLATE:
         return ResourceKind.TEMPLATE
+    if tag_type == TagType.POLICY:  # NEW
+        return ResourceKind.POLICY
+    if tag_type == TagType.TOOL_INSTRUCTION:  # NEW
+        return ResourceKind.TOOL_INSTRUCTION
     if tag_type == TagType.AGENT:
         return ResourceKind.AGENT
+    if tag_type == TagType.AGENT_BINDING:  # NEW
+        return ResourceKind.AGENT_BINDING
     if tag_type == TagType.MCP:
         return ResourceKind.MCP
     raise ValueError(f"Unsupported TagType for resources: {tag_type}")
@@ -119,7 +124,7 @@ class TagService:
         # Validate referenced items first
         if tag_data.type == TagType.DOCUMENT:
             documents = self._retrieve_documents_metadata(tag_data.item_ids)
-        elif tag_data.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
+        elif tag_data.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP, TagType.POLICY, TagType.TOOL_INSTRUCTION):
             documents = []  # not used here
             # Optionnel: validation côté ResourceService si tu veux fail-fast sur ids inexistants
             # rk = _tagtype_to_rk(tag_data.type)
@@ -154,7 +159,7 @@ class TagService:
                     new_tag_id=tag.id,
                     modified_by=user.username,
                 )
-        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
+        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP, TagType.POLICY, TagType.TOOL_INSTRUCTION):
             rk = _tagtype_to_rk(tag.type)
             for rid in tag_data.item_ids:
                 try:
@@ -276,7 +281,5 @@ class TagService:
         existing = self._tag_store.get_by_owner_type_full_path(owner_id, tag_type, full_path)
         if existing and existing.id != (exclude_tag_id or ""):
             if existing.type == tag_type:
-                raise TagAlreadyExistsError(
-                    f"Tag '{full_path}' already exists for owner {owner_id} and type {tag_type}."
-                )
+                raise TagAlreadyExistsError(f"Tag '{full_path}' already exists for owner {owner_id} and type {tag_type}.")
         return
