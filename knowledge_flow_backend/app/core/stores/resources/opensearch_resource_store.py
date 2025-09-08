@@ -153,7 +153,8 @@ class OpenSearchResourceStore(BaseResourceStore):
         - Once stable, we can reduce this to a single debug/info line.
         """
         kind_value = kind.value  # Make enum explicit
-        logger.debug(f"[RESOURCES] Checking existence for name='{name}', kind='{kind_value}', library_tag_id='{library_tag_id}'")
+        logger.info("========================================================================")
+        logger.info(f"[RESOURCES] Checking existence for name='{name}', kind='{kind_value}', library_tag_id='{library_tag_id}'")
 
         query = {
             "query": {
@@ -169,20 +170,23 @@ class OpenSearchResourceStore(BaseResourceStore):
             "_source": True,  # show the hit’s source in logs for investigation
         }
 
-        logger.debug(f"[RESOURCES] Query body for existence check:\n{query}")
+        logger.info(f"[RESOURCES] Query body for existence check:\n{query}")
 
         try:
             resp = self.client.search(index=self.index_name, body=query)
-            logger.debug(f"[RESOURCES] Raw search response: {resp}")
+            logger.info(f"[RESOURCES] Raw search response: {resp}")
 
             hits = resp.get("hits", {}).get("hits", [])
-            logger.debug(f"[RESOURCES] Number of hits: {len(hits)}")
+            logger.info(f"[RESOURCES] Number of hits: {len(hits)}")
 
             if hits:
-                logger.debug(f"[RESOURCES] First hit _source: {hits[0].get('_source')}")
+                logger.info(f"[RESOURCES] First hit _source: {hits[0].get('_source')}")
+                logger.info("========================================================================")
+        
                 return True
             else:
-                logger.debug("[RESOURCES] No hits found → returning False")
+                logger.info("[RESOURCES] No hits found → returning False")
+                logger.info("========================================================================")
                 return False
             
         except Exception as e:
@@ -193,7 +197,7 @@ class OpenSearchResourceStore(BaseResourceStore):
             raise
 
         
-    def search(self, *, name: str, kind: TagType, library_tag_name: str) -> List[Resource]:
+    def get_resource_by_name(self, *, name: str, kind: TagType, library_tag_id: str) -> List[Resource]:
         """
         Executes a precise search for resources based on name, kind, and library tag name.
         """
@@ -203,12 +207,15 @@ class OpenSearchResourceStore(BaseResourceStore):
                     "must": [
                         {"term": {"name.keyword": name}},
                         {"term": {"kind": kind.value}},
-                        {"term": {"library_tags": library_tag_name}}  # Search for the logical name
+                        {"term": {"library_tags": library_tag_id}}  # Search for the logical name
                     ]
                 }
-            }
+            }, 
+            "size": 1,
+            "_source": True, 
         }
-        
+        logger.info(f"[RESOURCES] Query body for get_resource_by_name:\n{query}")
         resp = self.client.search(index=self.index_name, body=query)
+        logger.info(f"[RESOURCES] Raw search response: {resp}")
         return [Resource(**hit["_source"]) for hit in resp.get("hits", {}).get("hits", [])]
 

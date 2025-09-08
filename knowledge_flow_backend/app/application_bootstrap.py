@@ -109,7 +109,8 @@ def _create_resource(
         labels=labels or [],
     )
     try:
-        tag = tag_service.ensure_tag(user=get_system_actor(), tag_type=kind, name=DEFAULT_CATALOG.library_tag)
+        tag = tag_service.ensure_tag(user=get_system_actor(), tag_type=kind, name=DEFAULT_CATALOG.library_tag, create=True)
+        assert tag is not None  # should not happen with create=True
         return resource_service.create(library_tag_id=tag.id, payload=payload, user=get_system_actor())
     except ResourceAlreadyExistsError:
         # Expected case: the resource already exists, so we just skip it.

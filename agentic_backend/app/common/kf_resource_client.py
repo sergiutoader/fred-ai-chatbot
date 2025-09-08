@@ -54,3 +54,25 @@ class KfResourceClient(KfBaseClient):
             return None
         resp.raise_for_status()
         return self._json_or_none(resp)
+
+    def get_agent_binding(self, *, library: str, agent_name: str) -> Optional[Dict[str, Any]]:
+        url = f"{self.base_url}/catalogs/{library}/agent-bindings/{agent_name}"
+        try:
+            resp = self.session.get(url, timeout=5)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            raise KfServiceUnavailable(str(e)) from e
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_resource_by_name(self, *, library: str, resource_name: str) -> Optional[Dict[str, Any]]:
+        url = f"{self.base_url}/catalogs/{library}/resources/{resource_name}"
+        try:
+            resp = self.session.get(url, timeout=5)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            raise KfServiceUnavailable(str(e)) from e
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()

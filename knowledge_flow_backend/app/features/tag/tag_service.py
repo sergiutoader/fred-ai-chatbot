@@ -146,7 +146,7 @@ class TagService:
 
     # ---------- Convenience: get-or-create with (user, type, name) ----------
 
-    def ensure_tag(self, user: KeycloakUser, tag_type: TagType, name: str) -> Tag:
+    def ensure_tag(self, user: KeycloakUser, tag_type: TagType, name: str, create: bool = False) -> Tag | None:
         """
         Ensure a tag exists for (user, tag_type) identified by 'name'.
 
@@ -177,6 +177,8 @@ class TagService:
             existing = self._tag_store.get_by_owner_type_full_path(user.uid, tag_type, full_path)
             if existing:
                 return existing
+            if not create:
+                return None
             # else: create at the specified path
             tag = Tag(
                 id=str(uuid4()),
@@ -202,7 +204,8 @@ class TagService:
         if len(user_tags) > 1:
             # With your invariant this should not happen; keep it explicit.
             raise TagAlreadyExistsError(f"Multiple tags named '{leaf}' exist for user {user.uid} and type {tag_type}; this violates the uniqueness invariant.")
-
+        if not create:
+            return None
         # 4) Create root tag
         tag = Tag(
             id=str(uuid4()),

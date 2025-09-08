@@ -66,6 +66,8 @@ from fred_core.resources.bootstrap_resources import (
     DEFAULT_CATALOG,
     ResourceItem,
     AgentBinding,
+    AgentBindingHeader,
+    NodeOverrideHeader
 )
 from fred_core.resources.header_models import ResourceHeader
 
@@ -109,6 +111,8 @@ __all__ = [
     "DEFAULT_CATALOG",
     "ResourceItem",
     "AgentBinding",
+    "AgentBindingHeader",
+    "NodeOverrideHeader",
     "get_system_actor",
     "TagType",
     "parse_front_matter",

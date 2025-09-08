@@ -127,10 +127,11 @@ class OpenSearchTagStore(BaseTagStore):
             query = {
                 "query": {
                     "bool": {
-                        "must": [
-                            {"term": {"owner_id": user.uid}}
-                            # {"term": {"type": tag_type.value}},
-                        ]
+                        "should": [
+                            {"term": {"owner_id": user.uid}},
+                            {"term": {"owner_id": "system:fred-core"}},
+                        ],
+                        "minimum_should_match": 1
                     }
                 }
             }
@@ -213,11 +214,15 @@ class OpenSearchTagStore(BaseTagStore):
         body = {
             "query": {
                 "bool": {
-                    "filter": [
-                        {"term": {"owner_id": owner_id}},
+                    "must": [
                         {"term": {"type": tag_type.value}},
                         {"term": {"full_path": full_path}},
-                    ]
+                    ],
+                    "should": [
+                        {"term": {"owner_id": owner_id}},
+                        {"term": {"owner_id": "system:fred-core"}},
+                    ],
+                    "minimum_should_match": 1
                 }
             },
             "size": 1,

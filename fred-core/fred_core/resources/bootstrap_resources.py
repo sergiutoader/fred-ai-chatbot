@@ -26,7 +26,7 @@ Key principles
 --------------
 - Single library tag: "fred-core" (overridable by ops if needed).
 - Small set of *intents* to keep things discoverable: 
-  agent.system, node.system/*, policy.*, template.*, tool.instructions/*.
+  agent.system, node.system:*, policy.*, template.*, tool.instructions/*.
 - Minimal node overrides (only where specialization matters); everything else inherits
   the agent.system prompt + global policies.
 
@@ -55,7 +55,7 @@ class ResourceItem(BaseModel):
     """
     A single library resource: prompt, template, policy, or tool instruction.
 
-    - id: stable, path-like (e.g., "node.system/grade_documents.permissive")
+    - id: stable, path-like (e.g., "node.system:grade_documents.permissive")
     - kind: one of prompt|template|policy|tool_instruction
     - intent: broad grouping used by the UI (e.g., "node.system", "policy.citations")
     - node_key: optional; set for node.system prompts to indicate which node they target
@@ -148,18 +148,18 @@ class Catalog(BaseModel):
 # ---------- Helper constants (ids used below) ----------
 
 # Policies
-POLICY_JSON_STRICT = "policy.json/strict"
-POLICY_STYLE_CONCISE = "policy.style/concise"
-POLICY_CITATIONS_MD = "policy.citations/markdown"
+POLICY_JSON_STRICT = "policy.json:strict"
+POLICY_STYLE_CONCISE = "policy.style:concise"
+POLICY_CITATIONS_MD = "policy.citations:markdown"
 
 # Templates
-TEMPLATE_ANSWER_CITED_V1 = "template.answer/cited_v1"
+TEMPLATE_ANSWER_CITED_V1 = "template.answer:cited_v1"
 
 # Tool instructions
-TOOL_INSTR_VECTOR_SEARCH = "tool.instructions/vector_search"
-TOOL_INSTR_TABULAR = "tool.instructions/tabular_sql"
-TOOL_INSTR_SUPERVISION = "tool.instructions/supervision_metrics"
-TOOL_INSTR_RESOURCES_MCP = "tool.instructions/resources_mcp"
+TOOL_INSTR_VECTOR_SEARCH = "tool.instructions:vector_search"
+TOOL_INSTR_TABULAR = "tool.instructions:tabular_sql"
+TOOL_INSTR_SUPERVISION = "tool.instructions:supervision_metrics"
+TOOL_INSTR_RESOURCES_MCP = "tool.instructions:resources_mcp"
 
 # Agents (keys)
 AGENT_GENERALIST = "generalist"        # fallback generalist
@@ -169,11 +169,11 @@ AGENT_SUPERVISION = "supervision"    # (Sentinel/Supervisor)
 AGENT_CONTENT_ADMIN = "content_admin"  # Brontë
 
 # Agent-level system prompts
-AGENT_SYS_GENERALIST = "agent.system/generalist"
-AGENT_SYS_RAG = "agent.system/advanced_rag"
-AGENT_SYS_TABULAR = "agent.system/tabular"
-AGENT_SYS_SUPERVISION = "agent.system/supervision"
-AGENT_SYS_CONTENT_ADMIN = "agent.system/content_admin"
+AGENT_SYS_GENERALIST = "agent.system:generalist"
+AGENT_SYS_RAG = "agent.system:advanced_rag"
+AGENT_SYS_TABULAR = "agent.system:tabular"
+AGENT_SYS_SUPERVISION = "agent.system:supervision"
+AGENT_SYS_CONTENT_ADMIN = "agent.system:content_admin"
 
 
 # ---------- Items: prompts, policies, templates, tool instructions ----------
@@ -356,7 +356,7 @@ _ITEMS: List[ResourceItem] = [
 
     # ===== Node-level: Advanced RAG =====
     ResourceItem(
-        name="node.system/grade_documents.permissive",
+        name="node.system:grade_documents.permissive",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="grade_documents",
@@ -371,7 +371,7 @@ _ITEMS: List[ResourceItem] = [
         ),
     ),
     ResourceItem(
-        name="node.system/generate.answer_with_citations",
+        name="node.system:generate.answer_with_citations",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="generate",
@@ -383,7 +383,7 @@ _ITEMS: List[ResourceItem] = [
         ),
     ),
     ResourceItem(
-        name="node.system/rephrase_query.vectors",
+        name="node.system:rephrase_query.vectors",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="rephrase_query",
@@ -395,7 +395,7 @@ _ITEMS: List[ResourceItem] = [
         ),
     ),
     ResourceItem(
-        name="node.system/grade_answer.binary",
+        name="node.system:grade_answer.binary",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="grade_generation",
@@ -409,7 +409,7 @@ _ITEMS: List[ResourceItem] = [
 
     # ===== Node-level: Tabular Expert (typical slots) =====
     ResourceItem(
-        name="node.system/sql.plan",
+        name="node.system:sql.plan",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="plan_query",
@@ -421,7 +421,7 @@ _ITEMS: List[ResourceItem] = [
         ),
     ),
     ResourceItem(
-        name="node.system/sql.generate_safe",
+        name="node.system:sql.generate_safe",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="generate_sql",
@@ -434,7 +434,7 @@ _ITEMS: List[ResourceItem] = [
         ),
     ),
     ResourceItem(
-        name="node.system/sql.explain_results",
+        name="node.system:sql.explain_results",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="summarize_results",
@@ -448,7 +448,7 @@ _ITEMS: List[ResourceItem] = [
 
     # ===== Node-level: Supervision (ops slots) =====
     ResourceItem(
-        name="node.system/ops.analyze_window",
+        name="node.system:ops.analyze_window",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="analyze_window",
@@ -460,7 +460,7 @@ _ITEMS: List[ResourceItem] = [
         ),
     ),
     ResourceItem(
-        name="node.system/ops.summarize_findings",
+        name="node.system:ops.summarize_findings",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="summarize_findings",
@@ -473,7 +473,7 @@ _ITEMS: List[ResourceItem] = [
 
     # ===== Node-level: Content Admin assistant (MCP resources) =====
     ResourceItem(
-        name="node.system/resources.create_or_use",
+        name="node.system:resources.create_or_use",
         kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="reasoner",
@@ -506,23 +506,23 @@ _AGENTS: List[AgentBinding] = [
         node_overrides=[
             AgentNodeOverride(
                 node_key="grade_documents",
-                prompt_id="node.system/grade_documents.permissive",
+                prompt_id="node.system:grade_documents.permissive",
                 policies=[POLICY_JSON_STRICT],
             ),
             AgentNodeOverride(
                 node_key="generate",
-                prompt_id="node.system/generate.answer_with_citations",
+                prompt_id="node.system:generate.answer_with_citations",
                 policies=[POLICY_STYLE_CONCISE, POLICY_CITATIONS_MD],
                 template_id=TEMPLATE_ANSWER_CITED_V1,
             ),
             AgentNodeOverride(
                 node_key="rephrase_query",
-                prompt_id="node.system/rephrase_query.vectors",
+                prompt_id="node.system:rephrase_query.vectors",
                 policies=[POLICY_JSON_STRICT],
             ),
             AgentNodeOverride(
                 node_key="grade_generation",
-                prompt_id="node.system/grade_answer.binary",
+                prompt_id="node.system:grade_answer.binary",
                 policies=[POLICY_JSON_STRICT],
             ),
         ],
@@ -536,18 +536,18 @@ _AGENTS: List[AgentBinding] = [
         node_overrides=[
             AgentNodeOverride(
                 node_key="plan_query",
-                prompt_id="node.system/sql.plan",
+                prompt_id="node.system:sql.plan",
                 policies=[POLICY_STYLE_CONCISE],
             ),
             AgentNodeOverride(
                 node_key="generate_sql",
-                prompt_id="node.system/sql.generate_safe",
+                prompt_id="node.system:sql.generate_safe",
                 policies=[POLICY_STYLE_CONCISE, POLICY_JSON_STRICT],
                 template_id=None,
             ),
             AgentNodeOverride(
                 node_key="summarize_results",
-                prompt_id="node.system/sql.explain_results",
+                prompt_id="node.system:sql.explain_results",
                 policies=[POLICY_STYLE_CONCISE],
             ),
         ],
@@ -560,12 +560,12 @@ _AGENTS: List[AgentBinding] = [
         node_overrides=[
             AgentNodeOverride(
                 node_key="analyze_window",
-                prompt_id="node.system/ops.analyze_window",
+                prompt_id="node.system:ops.analyze_window",
                 policies=[POLICY_STYLE_CONCISE],
             ),
             AgentNodeOverride(
                 node_key="summarize_findings",
-                prompt_id="node.system/ops.summarize_findings",
+                prompt_id="node.system:ops.summarize_findings",
                 policies=[POLICY_STYLE_CONCISE],
             ),
         ],
@@ -578,7 +578,7 @@ _AGENTS: List[AgentBinding] = [
         node_overrides=[
             AgentNodeOverride(
                 node_key="reasoner",
-                prompt_id="node.system/resources.create_or_use",
+                prompt_id="node.system:resources.create_or_use",
                 policies=[POLICY_STYLE_CONCISE],
             ),
         ],

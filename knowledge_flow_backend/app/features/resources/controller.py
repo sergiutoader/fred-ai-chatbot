@@ -19,7 +19,7 @@ from fastapi.params import Query
 from typing_extensions import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
-from fred_core import KeycloakUser, get_current_user
+from fred_core import KeycloakUser, get_current_user, AgentBindingHeader
 
 from app.core.stores.resources.base_resource_store import (
     ResourceNotFoundError,
@@ -28,6 +28,8 @@ from app.core.stores.resources.base_resource_store import (
 from app.features.resources.service import ResourceService
 from app.features.resources.structures import Resource, ResourceCreate, ResourceUpdate
 from fred_core import TagType
+
+from app.features.tag.tag_service import TagService
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,7 @@ class ResourceController:
 
     def __init__(self, router: APIRouter):
         self.service = ResourceService()
+        self.tag_service = TagService()
 
         def handle_exception(e: Exception) -> HTTPException:
             if isinstance(e, ResourceNotFoundError):
@@ -122,27 +125,31 @@ class ResourceController:
                 raise handle_exception(e)
 
         @router.get(
-            "/resources/search",
+            "/resources-pack/by-name",
             tags=["Resources"],
             response_model=List[Resource],
             response_model_exclude_none=True,
             summary="Search for resources by name, kind, and library tag.",
         )
-        async def search_resources(
-            name: Annotated[str, Query(description="The unique name of the resource (e.g., 'agent.system/generalist')")],
+        async def search_resource_by_name(
+            name: Annotated[str, Query(description="The unique name of the resource (e.g., 'agent.system:generalist')")],
             kind: Annotated[TagType, Query(description="The kind of resource (e.g., 'prompt', 'agent_binding')")],
             library_tag_name: Annotated[str, Query(description="The library tag name to scope the search")],
             user: KeycloakUser = Depends(get_current_user),
         ) -> List[Resource]:
             try:
+                tag = self.tag_service.ensure_tag(user=user, tag_type=kind, name=library_tag_name, create=False)
+                if not tag: 
+                    raise HTTPException(status_code=404, detail=f"Library tag '{library_tag_name}' not found")
+                
                 return self.service.search_resources(
-                    name=name, kind=kind, library_tag_name=library_tag_name
+                    name=name, kind=kind, library_tag_id=tag.id  # Pass tag ID here
                 )
             except Exception as e:
                 raise handle_exception(e)
 
         @router.get(
-            "/resources",
+            "/resources-pack/by-kind",
             tags=["Resources"],
             response_model=List[Resource],
             response_model_exclude_none=True,
@@ -168,5 +175,27 @@ class ResourceController:
         ) -> None:
             try:
                 self.service.delete(id=id)
+            except Exception as e:
+                raise handle_exception(e)
+
+        @router.get(
+            "/resources-pack/bindings/{library_tag_name}/agent-bindings/{agent_name}",
+            tags=["Resources"],
+            response_model=AgentBindingHeader,
+            summary="Get an agent binding by (library, agent_name).",
+        )
+        async def get_agent_binding_by_library_and_name(
+            library_tag_name: str,
+            agent_name: str,
+            user: KeycloakUser = Depends(get_current_user),
+        ) -> AgentBindingHeader:
+            try:
+                tag = self.tag_service.ensure_tag(user=user, tag_type=TagType.AGENT_BINDING, name=library_tag_name, create=False)
+                if not tag: 
+                    raise HTTPException(status_code=404, detail=f"Library tag '{library_tag_name}' not found")
+                return self.service.get_agent_binding_by_name(
+                    library_tag_id=tag.id,
+                    agent_name=agent_name,
+                )
             except Exception as e:
                 raise handle_exception(e)

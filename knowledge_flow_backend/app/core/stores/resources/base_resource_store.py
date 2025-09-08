@@ -78,9 +78,9 @@ class BaseResourceStore(ABC):
         pass
 
     @abstractmethod
-    def search(self, *, name: str, kind: TagType, library_tag_name: str) -> List[Resource]:
+    def get_resource_by_name(self, *, name: str, kind: TagType, library_tag_id: str) -> List[Resource]:
         """
-        Search for resources based on name, kind, and library tag name.
+        Search for resources based on name, kind, and library tag ID.
         Returns a list of resource dictionaries matching the criteria.
         """
         pass    

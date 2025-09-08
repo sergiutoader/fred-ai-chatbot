@@ -3,7 +3,6 @@
 
 from pathlib import Path
 from typing import List
-
 from pydantic import ValidationError
 
 from fred_core import TagType, DuckDBTableStore
@@ -212,7 +211,7 @@ class DuckdbResourceStore(BaseResourceStore):
             result = conn.execute(query, [name, kind.value, library_tag_id]).fetchone()
             return result is not None
 
-    def search(self, *, name: str, kind: TagType, library_tag_name: str) -> List[Resource]:
+    def get_resource_by_name(self, *, name: str, kind: TagType, library_tag_name: str) -> List[Resource]:
         """
         Executes a precise search for resources based on name, kind, and library tag name.
         """
