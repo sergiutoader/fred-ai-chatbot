@@ -18,7 +18,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union, Annotated, Literal
 
 from pydantic import BaseModel, Field, ConfigDict
-from fred_core import VectorSearchHit
+from fred_core import VectorSearchHit, utc_now
 
 from app.core.agents.runtime_context import RuntimeContext  # Unchanged, as requested
 
@@ -242,7 +242,7 @@ def make_user_text(session_id, exchange_id, rank, text: str) -> ChatMessage:
         session_id=session_id,
         exchange_id=exchange_id,
         rank=rank,
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
         role=Role.user,
         channel=Channel.final,
         parts=[TextPart(text=text)],
@@ -262,7 +262,7 @@ def make_assistant_final(
         session_id=session_id,
         exchange_id=exchange_id,
         rank=rank,
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
         role=Role.assistant,
         channel=Channel.final,
         parts=parts,
@@ -275,7 +275,7 @@ def make_tool_call(session_id, exchange_id, rank, call_id, name, args) -> ChatMe
         session_id=session_id,
         exchange_id=exchange_id,
         rank=rank,
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now(),
         role=Role.assistant,
         channel=Channel.tool_call,
         parts=[ToolCallPart(call_id=call_id, name=name, args=args)],
@@ -289,7 +289,7 @@ def make_tool_result(
         session_id=session_id,
         exchange_id=exchange_id,
         rank=rank,
-        timestamp=datetime.utcnow(),
+        timestamp=utc_now,
         role=Role.tool,
         channel=Channel.tool_result,
         parts=[ToolResultPart(call_id=call_id, ok=ok, latency_ms=ms, content=content)],

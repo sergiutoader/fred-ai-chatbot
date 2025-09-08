@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timezone
 import logging
 import traceback
 from pydantic import ValidationError
@@ -117,23 +116,6 @@ def log_exception(e: Exception, context_message: Optional[str] = None) -> str:
     logger.debug("🧵 Stack trace:\n%s", stack_trace, stacklevel=2)
 
     return summary
-
-
-def utc_now_iso() -> str:
-    """
-    Returns the current UTC timestamp as an ISO 8601 formatted string.
-
-    This utility is useful for ensuring consistent and timezone-aware
-    timestamps across metadata (e.g., `created_at`, `updated_at`).
-
-    Example:
-        >>> utc_now_iso()
-        '2025-06-21T14:32:05.123456+00:00'
-
-    Returns:
-        str: The current UTC time in ISO 8601 format with timezone info.
-    """
-    return datetime.now(timezone.utc).isoformat()
 
 
 def count_tokens(text: str) -> int:

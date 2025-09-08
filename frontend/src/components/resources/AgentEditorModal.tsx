@@ -31,8 +31,7 @@ import {
 import {
   Resource as KFResource,
   useListResourcesByKindKnowledgeFlowV1ResourcesGetQuery,
-  // Adapte ce nom si besoin dans ton slice
-  useLazyGetResourceKnowledgeFlowV1ResourcesResourceIdGetQuery,
+  useLazyGetResourceKnowledgeFlowV1ResourcesIdGetQuery,
 } from "../../slices/knowledgeFlow/knowledgeFlowOpenApi";
 
 const mcpServerSchema = z.object({
@@ -265,7 +264,7 @@ export const AgentEditorModal: React.FC<AgentEditorModalProps> = ({
   );
 
   const [getResourceById, { isFetching: loadingOne }] =
-    useLazyGetResourceKnowledgeFlowV1ResourcesResourceIdGetQuery();
+    useLazyGetResourceKnowledgeFlowV1ResourcesIdGetQuery();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -311,7 +310,7 @@ export const AgentEditorModal: React.FC<AgentEditorModalProps> = ({
     if (!extracted.length && (item as any)?.id) {
       try {
         console.log("[AgentEditor] fetching full resource by id:", (item as any).id);
-        const full = await getResourceById({ resourceId: (item as any).id }).unwrap();
+        const full = await getResourceById({ id: (item as any).id }).unwrap();
         console.log("[AgentEditor] full resource fetched:", full);
         if (full && (full as any).content) {
           const content: string = (full as any).content;

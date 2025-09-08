@@ -13,24 +13,9 @@
 # limitations under the License.
 
 from datetime import datetime
-from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, field_validator
-from fred_core import BaseModelWithId
-
-
-# app/features/tag/structure.py
-
-
-class TagType(str, Enum):
-    DOCUMENT = "document"
-    PROMPT = "prompt"
-    TEMPLATE = "template"
-    POLICY = "policy"
-    TOOL_INSTRUCTION = "tool_instruction"
-    AGENT = "agent"
-    AGENT_BINDING = "agent_binding"
-    MCP = "mcp"
+from pydantic import BaseModel, Field, field_validator
+from fred_core import BaseModelWithId, TagType, timestamp
 
 
 def _normalize_path(p: Optional[str]) -> Optional[str]:
@@ -92,8 +77,8 @@ class TagUpdate(BaseModel):
 
 
 class Tag(BaseModelWithId):
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(default_factory=lambda: timestamp(as_datetime=True))
+    updated_at: datetime = Field(default_factory=lambda: timestamp(as_datetime=True))
     owner_id: str
 
     name: str  # leaf segment, e.g. 'HR'

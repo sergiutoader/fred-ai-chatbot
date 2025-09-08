@@ -37,21 +37,21 @@ Public surface:
 from abc import abstractmethod
 from datetime import datetime
 import logging
-from typing import List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
 from anyio.abc import TaskGroup  # typing-friendly protocol for TaskGroup
-from IPython.display import Image
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
-from langchain_core.messages import SystemMessage, BaseMessage
 
+from langchain_core.messages import SystemMessage, BaseMessage, AnyMessage
+import yaml
+
+from app.common.kf_base_client import KfResourceNotFoundError, KfServiceUnavailable
+from app.common.kf_resource_client import KfResourceClient
 from app.common.structures import AgentSettings
-from app.core.agents.agent_state import Prepared, resolve_prepared
-from app.application_context import get_knowledge_flow_base_url
 from app.core.agents.runtime_context import RuntimeContext
 
 logger = logging.getLogger(__name__)
-
 
 class AgentFlow:
     """
@@ -102,7 +102,7 @@ class AgentFlow:
             self.__class__, "description", ""
         )
         self.icon = getattr(self.__class__, "icon", "")
-        self.tag = agent_settings.tag or getattr(self.__class__, "tag", "")
+        self.tag = agent_settings.tag
         self.categories = agent_settings.categories or getattr(
             self.__class__, "categories", []
         )
@@ -116,6 +116,8 @@ class AgentFlow:
         self.compiled_graph: Optional[CompiledStateGraph] = None
         self.runtime_context: Optional[RuntimeContext] = None
         self._started: bool = False  # guard to avoid double-start
+        self._resource_client = KfResourceClient()
+        self._agent_binding: Optional[Dict] = None
 
     @abstractmethod
     async def async_init(self):
@@ -182,21 +184,6 @@ class AgentFlow:
             )
         return self.compiled_graph
 
-    def use_fred_prompts(self, messages: Sequence[BaseMessage]) -> List[BaseMessage]:
-        """
-        Merge UI-selected prompts + agent base_prompt into ONE SystemMessage.
-
-        Why:
-        - Keeps ordering/formatting stable and auditable.
-        - Prevents “prompt soup” and surprise overrides.
-
-        If nothing is selected, returns messages unchanged.
-        """
-        sys_text = self._compose_fred_system_text().strip()
-        if not sys_text:
-            return list(messages)
-        return [SystemMessage(content=sys_text), *messages]
-
     def set_runtime_context(self, context: RuntimeContext) -> None:
         """
         Inject per-turn runtime context (e.g., tenant/library, time window).
@@ -210,41 +197,122 @@ class AgentFlow:
         """
         return self.runtime_context
 
-    def save_graph_image(self, path: str):
-        """
-        Save this agent's compiled graph as a PNG (Mermaid-rendered).
-
-        Args:
-            path: Directory path where the image will be written (filename is `<name>.png`).
-        """
-        if self._graph is None:
-            raise ValueError("Graph is not defined. Build it in async_init().")
-        compiled_graph = self.get_compiled_graph()
-        graph = Image(compiled_graph.get_graph().draw_mermaid_png())
-        with open(f"{path}/{self.name}.png", "wb") as f:
-            f.write(graph.data)
-
     def __str__(self) -> str:
         """Human-friendly identifier."""
         return f"{self.name} ({self.nickname}): {self.description}"
 
-    # --------------------------------
-    # Private helpers (below the fold)
-    # --------------------------------
 
-    def _compose_fred_system_text(self) -> str:
+    async def load_agent_configuration(self, fallback_prompt_func):
         """
-        INTERNAL: Build the single SystemMessage contents from:
-        - selected Fred prompt resources (via Knowledge-Flow),
-        - this agent's `base_prompt`.
+        Loads the agent's binding and resolves the system prompt.
 
-        Order is preserved: [selected prompts] then [base_prompt].
+        Args:
+            fallback_prompt_func: A function to call if the database lookup fails.
         """
-        ctx = self.get_runtime_context() or RuntimeContext()
-        prepared: Prepared = resolve_prepared(ctx, get_knowledge_flow_base_url())
+        try:
+            binding_resource: Optional[Dict[str, Any]] = self._resource_client.get_resource(id=self.tag)
 
-        pre_text = (prepared.prompt_text or "").strip()
-        base_text = (self.base_prompt or "").strip()
-        if pre_text and base_text:
-            return f"{pre_text}\n\n{base_text}"
-        return pre_text or base_text
+            if binding_resource is None:
+                raise KfResourceNotFoundError(f"Agent binding '{self.tag}' not found.")
+            
+            # Use explicit type checking and defensive access.
+            content_str = binding_resource.get("content", "")
+            if not isinstance(content_str, str) or not content_str:
+                raise ValueError("Agent binding content is empty or malformed.")
+            
+            # The split will always return at least one element. We check for a second one.
+            parts = content_str.split('---', 2)
+            if len(parts) < 3:
+                raise ValueError("Agent binding content is malformed.")
+            
+            self._agent_binding = yaml.safe_load(parts[-1])
+            if not isinstance(self._agent_binding, dict):
+                raise ValueError("Agent binding YAML is not a valid dictionary.")
+
+            system_prompt_id = self._agent_binding.get("system_prompt_id")
+            if not isinstance(system_prompt_id, str) or not system_prompt_id:
+                raise ValueError("System prompt ID is missing or not a string.")
+                
+            prompt_resource: Optional[Dict[str, Any]] = self._resource_client.get_resource(id=system_prompt_id)
+            if prompt_resource is None:
+                raise KfResourceNotFoundError(f"Prompt with ID '{system_prompt_id}' not found.")
+            
+            prompt_content = prompt_resource.get("content")
+            if not isinstance(prompt_content, str) or not prompt_content:
+                raise ValueError("System prompt content is empty or not a string.")
+            
+            self.base_prompt = prompt_content
+            logger.info(f"Loaded agent '{self.name}' with system prompt from '{system_prompt_id}'.")
+
+        except (KfServiceUnavailable, KfResourceNotFoundError, ValueError, yaml.YAMLError) as e:
+            logger.warning(
+                f"Could not load binding or prompt for '{self.name}'. "
+                f"Using default fallback. Error: {e}"
+            )
+            self.base_prompt = fallback_prompt_func()
+
+
+    def get_node_prompt(self, node_key: str) -> Optional[str]:
+        """
+        Returns the specific prompt for a given node, if an override exists.
+        
+        Args:
+            node_key: The unique identifier for the graph node (e.g., 'reasoner', 'rephrase_query').
+        
+        Returns:
+            The prompt content string or None if no override is found.
+        """
+        if self._agent_binding is None:
+            return None
+
+        node_overrides: Optional[List[Dict[str, Any]]] = self._agent_binding.get("node_overrides")
+        if not isinstance(node_overrides, list):
+            return None
+
+        for override in node_overrides:
+            if override.get("node_key") == node_key:
+                prompt_id = override.get("prompt_id")
+                if isinstance(prompt_id, str):
+                    try:
+                        prompt_resource: Optional[Dict[str, Any]] = self._resource_client.get_resource(id=prompt_id)
+                        if isinstance(prompt_resource, dict):
+                            content = prompt_resource.get("content")
+                            if isinstance(content, str):
+                                return content
+                    except (KfServiceUnavailable, KfResourceNotFoundError, yaml.YAMLError) as e:
+                        logger.warning(
+                            f"Failed to fetch override prompt for node '{node_key}'. Error: {e}"
+                        )
+                return None
+        return None
+
+    async def compose_messages(
+        self,
+        node_key: str,
+        messages: List[AnyMessage],
+        context: Optional[str] = None
+    ) -> List[BaseMessage]:
+        """
+        Generates a final list of messages for the LLM by combining:
+        1. An optional node-specific system prompt (from the binding).
+        2. The agent's global system prompt (base_prompt).
+        3. The provided user messages.
+        
+        Args:
+            node_key: The identifier for the current node, used to find overrides.
+            messages: The list of user/assistant messages for the turn.
+            context: An optional string to be added to the system prompt (e.g., from tools).
+        
+        Returns:
+            A new list of messages with the system prompts prepended.
+        """
+        system_prompt_text: str = self.base_prompt
+        
+        node_prompt_content: Optional[str] = self.get_node_prompt(node_key)
+        if node_prompt_content:
+            system_prompt_text = f"{node_prompt_content}\n\n{system_prompt_text}"
+        
+        if context:
+            system_prompt_text = f"{system_prompt_text}\n\n{context}"
+        
+        return [SystemMessage(content=system_prompt_text), *messages]

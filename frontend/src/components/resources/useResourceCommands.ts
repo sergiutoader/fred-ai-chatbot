@@ -4,12 +4,12 @@
 import { useCallback } from "react";
 import {
   Resource,
-  ResourceKind,
+  TagType,
   TagWithItemsId,
   useCreateResourceKnowledgeFlowV1ResourcesPostMutation,
   useUpdateTagKnowledgeFlowV1TagsTagIdPutMutation,
-  useUpdateResourceKnowledgeFlowV1ResourcesResourceIdPutMutation,
-  useLazyGetResourceKnowledgeFlowV1ResourcesResourceIdGetQuery,
+  useUpdateResourceKnowledgeFlowV1ResourcesIdPutMutation,
+  useLazyGetResourceKnowledgeFlowV1ResourcesIdGetQuery,
 } from "../../slices/knowledgeFlow/knowledgeFlowOpenApi";
 import { useToast } from "../ToastProvider";
 import { useTranslation } from "react-i18next";
@@ -36,15 +36,15 @@ type UpdateInput = {
 };
 
 export function useResourceCommands(
-  kind: ResourceKind,
+  kind: TagType,
   { refetchTags, refetchResources }: ResourceRefresher = {},
 ) {
   const { t } = useTranslation();
   const { showSuccess, showError } = useToast();
 
   const [createResourceMutation] = useCreateResourceKnowledgeFlowV1ResourcesPostMutation();
-  const [updateResourceMutation] = useUpdateResourceKnowledgeFlowV1ResourcesResourceIdPutMutation();
-  const [triggerGetResource] = useLazyGetResourceKnowledgeFlowV1ResourcesResourceIdGetQuery();
+  const [updateResourceMutation] = useUpdateResourceKnowledgeFlowV1ResourcesIdPutMutation();
+  const [triggerGetResource] = useLazyGetResourceKnowledgeFlowV1ResourcesIdGetQuery();
   const [updateTag] = useUpdateTagKnowledgeFlowV1TagsTagIdPutMutation();
 
   const refresh = useCallback(async () => {
@@ -88,7 +88,7 @@ export function useResourceCommands(
     async (resourceId: string, patch: UpdateInput) => {
       try {
         await updateResourceMutation({
-          resourceId,
+          id: resourceId,
           resourceUpdate: {
             content: patch.content,
             name: patch.name,
@@ -120,7 +120,7 @@ export function useResourceCommands(
    */
   const getResource = useCallback(async (resourceId: string) => {
     try {
-      const res = await triggerGetResource({ resourceId }).unwrap();
+      const res = await triggerGetResource({ id: resourceId }).unwrap();
       return res;
     } catch (e: any) {
       showError?.({

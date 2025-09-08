@@ -9,7 +9,7 @@ from fred_core import VectorSearchHit
 from langchain.schema.document import Document
 
 from app.application_context import ApplicationContext
-from app.features.tag.service import TagService
+from app.features.tag.tag_service import TagService
 
 logger = logging.getLogger(__name__)
 

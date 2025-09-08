@@ -12,54 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# In app/core/agents/GeneralistExpert.py
+
 import logging
 from datetime import datetime
 from typing import List
 
 from langgraph.graph import START, END, MessagesState, StateGraph
+from langchain_core.messages import BaseMessage
+
 from app.common.structures import AgentSettings
 from app.core.model.model_factory import get_model
 from app.core.agents.flow import AgentFlow
 
 logger = logging.getLogger(__name__)
 
-
 class GeneralistExpert(AgentFlow):
-    """
-    Generalist Expert provides guidance on a wide range of topics
-    without deep specialization.
-    """
-
-    # Class-level metadata
-    name: str | None = "GeneralistExpert"
-    nickname: str | None = "Georges"
-    role: str | None = "Fallback Generalist Expert"
-    description: (
-        str | None
-    ) = """Provides broad, high-level guidance when no specific expert is better suited. 
-        Acts as a default agent to assist with general questions across all domains."""
-    icon: str = "generalist_agent"
-    categories: List[str] = ["General"]
-    tag: str = "generalist"
 
     def __init__(self, agent_settings: AgentSettings):
         super().__init__(agent_settings=agent_settings)
 
     async def async_init(self):
+        # The base class handles fetching the binding and the base prompt.
+        await self.load_agent_configuration(self._generate_fallback_prompt)
         self.model = get_model(self.agent_settings.model)
-        self.base_prompt = self._generate_prompt()
         self._graph = self._build_graph()
 
-    def _generate_prompt(self) -> str:
+    def _generate_fallback_prompt(self) -> str:
+        # A hardcoded fallback, just in case the API is down or the binding is missing.
         today = datetime.now().strftime("%Y-%m-%d")
-        return "\n".join(
-            [
-                "You are a friendly generalist expert, skilled at providing guidance on a wide range of topics without deep specialization.",
-                "Your role is to respond with clarity, providing accurate and reliable information.",
-                "When appropriate, highlight elements that could be particularly relevant.",
-                f"The current date is {today}.",
-                "In case of graphical representation, render mermaid diagrams code.",
-            ]
+        return (
+            f"You are a friendly generalist expert. The current date is {today}."
         )
 
     def _build_graph(self) -> StateGraph:
@@ -70,7 +53,13 @@ class GeneralistExpert(AgentFlow):
         return builder
 
     async def reasoner(self, state: MessagesState):
-        messages = self.use_fred_prompts(state["messages"])
+        # Call the new, clean API to get the full list of messages.
+        # We pass in the node's key ('expert' in this case).
+        messages: List[BaseMessage] = await self.compose_messages(
+            node_key="expert",
+            messages=state["messages"]
+        )
+        
         assert self.model is not None
         response = await self.model.ainvoke(messages)
         return {"messages": [response]}

@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timezone
 import logging
-
+from fred_core import utc_now
 from app.common.document_structures import DocumentMetadata
 from app.core.stores.metadata.base_metadata_store import MetadataDeserializationError
 from app.application_context import ApplicationContext
@@ -94,7 +93,7 @@ class MetadataService:
             if new_tag_id not in tag_ids:
                 tag_ids.append(new_tag_id)
                 metadata.tags.tag_ids = tag_ids
-                metadata.identity.modified = datetime.now(timezone.utc)
+                metadata.identity.modified = utc_now()
                 metadata.identity.last_modified_by = modified_by
                 self.metadata_store.save_metadata(metadata)
                 logger.info(f"[METADATA] Added tag '{new_tag_id}' to document '{metadata.document_name}' by '{modified_by}'")
@@ -132,7 +131,7 @@ class MetadataService:
                     logger.warning(f"Could not delete SQL table '{table_name}': {e}")
 
             else:
-                metadata.identity.modified = datetime.now(timezone.utc)
+                metadata.identity.modified = utc_now()
                 metadata.identity.last_modified_by = modified_by
                 self.metadata_store.save_metadata(metadata)
                 logger.info(f"[METADATA] Removed tag '{tag_id_to_remove}' from document '{metadata.document_name}' by '{modified_by}'")
@@ -151,7 +150,7 @@ class MetadataService:
                 raise MetadataNotFound(f"Document '{document_uid}' not found.")
 
             metadata.source.retrievable = value
-            metadata.identity.modified = datetime.now(timezone.utc)
+            metadata.identity.modified = utc_now()
             metadata.identity.last_modified_by = modified_by
 
             self.metadata_store.save_metadata(metadata)
@@ -206,7 +205,7 @@ class MetadataService:
         """
         try:
             # Import here to avoid circular imports
-            from app.features.tag.service import TagService
+            from app.features.tag.tag_service import TagService
 
             tag_service = TagService()
 

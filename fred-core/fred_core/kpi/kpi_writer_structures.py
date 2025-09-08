@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, Iterable, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
+from fred_core import utc_now
 
 # --------------------
 # Metric & Event types
@@ -136,7 +137,7 @@ class KPIActor(BaseModel):
 
 
 class KPIEvent(BaseModel):
-    timestamp: datetime = Field(default_factory=datetime.utcnow, alias="@timestamp")
+    timestamp: datetime = Field(default_factory=lambda: utc_now, alias="@timestamp")
     metric: Metric
     dims: Dims = Field(default_factory=dict)
     cost: Optional[Cost] = None

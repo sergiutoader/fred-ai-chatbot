@@ -41,18 +41,15 @@ How to use
 """
 
 from __future__ import annotations
-
-from typing import List, Optional, Dict, Literal
+from datetime import datetime
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 import hashlib
 import json
-from datetime import datetime
-
+from fred_core.resources.tags import TagType  
+from fred_core.common.timestamp import timestamp
 
 # ---------- Data models (small and explicit) ----------
-
-Kind = Literal["prompt", "template", "policy", "tool_instruction"]
-
 
 class ResourceItem(BaseModel):
     """
@@ -67,7 +64,7 @@ class ResourceItem(BaseModel):
     - metadata: free-form; the seeder can persist it alongside content
     """
     name: str
-    kind: Kind
+    kind: str
     intent: str
     title: str
     description: str
@@ -96,17 +93,31 @@ class AgentBinding(BaseModel):
     Declarative binding between an agent and the resources it should use by default.
 
     - key: stable backend key for the agent (not necessarily the class name)
-    - display_name: UI label (kept here for convenience)
     - system_prompt_id: agent-level "soul" prompt id
     - node_overrides: targeted specializations for specific nodes
     """
     name: str
-    display_name: str
     system_prompt_id: str
     node_overrides: List[AgentNodeOverride] = Field(default_factory=list)
     # Optional: default policies applied to *every* node; usually empty to avoid duplication
     default_policies: List[str] = Field(default_factory=list)
 
+class NodeOverrideHeader(BaseModel):
+    node_key: str
+    prompt_id: Optional[str] = None
+    policies: List[str] = []
+    template_id: Optional[str] = None
+
+class AgentBindingHeader(BaseModel):
+    """
+    Header of an AGENT_BINDING resource written by your bootstrap.
+    """
+    name: str
+    kind: str = "agent_binding"
+    version: str = "v1"
+    system_prompt_id: str
+    default_policies: List[str] = []
+    node_overrides: List[NodeOverrideHeader] = []
 
 class Catalog(BaseModel):
     """
@@ -114,7 +125,8 @@ class Catalog(BaseModel):
     """
     version: int = 1
     library_tag: str = "fred-core"
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    library_description: str = "fred core default library"
+    created_at: datetime = Field(default_factory=lambda: timestamp(as_datetime=True))
     items: List[ResourceItem] = Field(default_factory=list)
     agents: List[AgentBinding] = Field(default_factory=list)
     digest: Optional[str] = None
@@ -150,12 +162,14 @@ TOOL_INSTR_SUPERVISION = "tool.instructions/supervision_metrics"
 TOOL_INSTR_RESOURCES_MCP = "tool.instructions/resources_mcp"
 
 # Agents (keys)
+AGENT_GENERALIST = "generalist"        # fallback generalist
 AGENT_RAG = "advanced_rag"           # Remulus
 AGENT_TABULAR = "tabular_expert"     # (Tessa-like)
 AGENT_SUPERVISION = "supervision"    # (Sentinel/Supervisor)
 AGENT_CONTENT_ADMIN = "content_admin"  # Brontë
 
 # Agent-level system prompts
+AGENT_SYS_GENERALIST = "agent.system/generalist"
 AGENT_SYS_RAG = "agent.system/advanced_rag"
 AGENT_SYS_TABULAR = "agent.system/tabular"
 AGENT_SYS_SUPERVISION = "agent.system/supervision"
@@ -169,7 +183,7 @@ _ITEMS: List[ResourceItem] = [
     # ===== Policies (reused across nodes/agents) =====
     ResourceItem(
         name=POLICY_JSON_STRICT,
-        kind="policy",
+        kind=TagType.POLICY.value,
         intent="policy.json",
         title="Strict JSON",
         description="For nodes that must return machine-parseable JSON; no prose.",
@@ -181,7 +195,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name=POLICY_STYLE_CONCISE,
-        kind="policy",
+        kind=TagType.POLICY.value,
         intent="policy.style",
         title="Style – concise",
         description="Short, direct sentences; remove filler and hedging.",
@@ -193,7 +207,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name=POLICY_CITATIONS_MD,
-        kind="policy",
+        kind=TagType.POLICY.value,
         intent="policy.citations",
         title="Citations – Markdown",
         description="Inline bracketed citations + final Sources section.",
@@ -207,7 +221,7 @@ _ITEMS: List[ResourceItem] = [
     # ===== Templates =====
     ResourceItem(
         name=TEMPLATE_ANSWER_CITED_V1,
-        kind="template",
+        kind=TagType.TEMPLATE.value,
         intent="template.answer",
         title="Cited Answer v1",
         description="Answer + final Sources. Keep it compact.",
@@ -224,7 +238,7 @@ _ITEMS: List[ResourceItem] = [
     # ===== Tool instructions =====
     ResourceItem(
         name=TOOL_INSTR_VECTOR_SEARCH,
-        kind="tool_instruction",
+        kind=TagType.TOOL_INSTRUCTION.value,
         intent="tool.instructions",
         title="Vector Search – tuning hints",
         description="Hints for adjusting top_k and respecting library tags across retries.",
@@ -236,7 +250,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name=TOOL_INSTR_TABULAR,
-        kind="tool_instruction",
+        kind=TagType.TOOL_INSTRUCTION.value,
         intent="tool.instructions",
         title="Tabular SQL – usage hints",
         description="Guidance for describing target tables, constraints, and safe LIMITs.",
@@ -248,7 +262,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name=TOOL_INSTR_SUPERVISION,
-        kind="tool_instruction",
+        kind=TagType.TOOL_INSTRUCTION.value,
         intent="tool.instructions",
         title="Supervision – metrics hints",
         description="Guidance for interpreting ops metrics and time windows.",
@@ -259,7 +273,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name=TOOL_INSTR_RESOURCES_MCP,
-        kind="tool_instruction",
+        kind=TagType.TOOL_INSTRUCTION.value,
         intent="tool.instructions",
         title="Resources MCP – prompts & templates",
         description="How to list/create/update resources via the MCP server.",
@@ -272,8 +286,22 @@ _ITEMS: List[ResourceItem] = [
 
     # ===== Agent-level system prompts =====
     ResourceItem(
+        name="agent.system/generalist",
+        kind=TagType.PROMPT.value,
+        intent="agent.system",
+        title="Generalist Expert - system",
+        description="The core persona and rules for the generalist agent.",
+        body="""You are a friendly generalist expert, skilled at providing guidance on a wide range of topics without deep specialization.
+            Your role is to respond with clarity, providing accurate and reliable information.
+            When appropriate, highlight elements that could be particularly relevant.
+            In case of graphical representation, render mermaid diagrams code.
+            Current date: {{today}}.""",
+        metadata={"agent": AGENT_GENERALIST},
+    ),
+
+    ResourceItem(
         name=AGENT_SYS_RAG,
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="agent.system",
         title="Advanced RAG – system",
         description="Baseline identity and global rules for RAG; always cite; be grounded.",
@@ -286,7 +314,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name=AGENT_SYS_TABULAR,
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="agent.system",
         title="Tabular Expert – system",
         description="Helps users query structured/tabular data; careful SQL; explain assumptions.",
@@ -299,10 +327,10 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name=AGENT_SYS_SUPERVISION,
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="agent.system",
         title="Supervision – system",
-        description="Ops assistant: interpret metrics, spot anomalies, suggest focused checks.",
+        description='"Ops assistant: interpret metrics, spot anomalies, suggest focused checks."',
         body=(
             "You are an operations supervision assistant. You interpret metrics, logs, and status snapshots to find "
             "actionable issues.\n"
@@ -313,7 +341,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name=AGENT_SYS_CONTENT_ADMIN,
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="agent.system",
         title="Content Admin – system",
         description="Assistant for managing prompts/templates via MCP; enforces formatting rules.",
@@ -329,7 +357,7 @@ _ITEMS: List[ResourceItem] = [
     # ===== Node-level: Advanced RAG =====
     ResourceItem(
         name="node.system/grade_documents.permissive",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="grade_documents",
         title="Grade Documents – permissive",
@@ -344,7 +372,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name="node.system/generate.answer_with_citations",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="generate",
         title="Generate – answer with citations",
@@ -356,7 +384,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name="node.system/rephrase_query.vectors",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="rephrase_query",
         title="Rephrase – vector retrieval",
@@ -368,7 +396,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name="node.system/grade_answer.binary",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="grade_generation",
         title="Grade Answer – binary",
@@ -382,7 +410,7 @@ _ITEMS: List[ResourceItem] = [
     # ===== Node-level: Tabular Expert (typical slots) =====
     ResourceItem(
         name="node.system/sql.plan",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="plan_query",
         title="Plan – clarify tabular task",
@@ -394,7 +422,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name="node.system/sql.generate_safe",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="generate_sql",
         title="Generate SQL – safe SELECT",
@@ -407,7 +435,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name="node.system/sql.explain_results",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="summarize_results",
         title="Explain – summarize tabular results",
@@ -421,7 +449,7 @@ _ITEMS: List[ResourceItem] = [
     # ===== Node-level: Supervision (ops slots) =====
     ResourceItem(
         name="node.system/ops.analyze_window",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="analyze_window",
         title="Analyze – metrics window",
@@ -433,7 +461,7 @@ _ITEMS: List[ResourceItem] = [
     ),
     ResourceItem(
         name="node.system/ops.summarize_findings",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="summarize_findings",
         title="Summarize – findings",
@@ -446,11 +474,11 @@ _ITEMS: List[ResourceItem] = [
     # ===== Node-level: Content Admin assistant (MCP resources) =====
     ResourceItem(
         name="node.system/resources.create_or_use",
-        kind="prompt",
+        kind=TagType.PROMPT.value,
         intent="node.system",
         node_key="reasoner",
         title="Resources – create vs use",
-        description="Enforce distinction: creating prompts/templates vs using templates.",
+        description='"Enforce distinction: creating prompts/templates vs using templates."',
         body=(
             "When asked to generate content from a template, do not create a new template. "
             "Fill the existing template's {variables} with provided values and return the result.\n"
@@ -464,10 +492,16 @@ _ITEMS: List[ResourceItem] = [
 
 _AGENTS: List[AgentBinding] = [
 
+    AgentBinding(
+        name=AGENT_GENERALIST,
+        system_prompt_id=AGENT_SYS_GENERALIST,
+        node_overrides=[],
+        default_policies=[],
+    ),
+
     # Advanced RAG (Remulus)
     AgentBinding(
         name=AGENT_RAG,
-        display_name="AdvancedRagExpert",
         system_prompt_id=AGENT_SYS_RAG,
         node_overrides=[
             AgentNodeOverride(
@@ -498,7 +532,6 @@ _AGENTS: List[AgentBinding] = [
     # Tabular Expert
     AgentBinding(
         name=AGENT_TABULAR,
-        display_name="TabularExpert",
         system_prompt_id=AGENT_SYS_TABULAR,
         node_overrides=[
             AgentNodeOverride(
@@ -523,7 +556,6 @@ _AGENTS: List[AgentBinding] = [
     # Supervision / Ops expert
     AgentBinding(
         name=AGENT_SUPERVISION,
-        display_name="SupervisionExpert",
         system_prompt_id=AGENT_SYS_SUPERVISION,
         node_overrides=[
             AgentNodeOverride(
@@ -542,7 +574,6 @@ _AGENTS: List[AgentBinding] = [
     # Content generator / admin assistant (Brontë)
     AgentBinding(
         name=AGENT_CONTENT_ADMIN,
-        display_name="ContentGeneratorExpert",
         system_prompt_id=AGENT_SYS_CONTENT_ADMIN,
         node_overrides=[
             AgentNodeOverride(
@@ -568,7 +599,7 @@ DEFAULT_CATALOG.digest = DEFAULT_CATALOG.compute_digest()
 
 # ---------- Convenience helpers (optional for seeders/UIs) ----------
 
-def iter_items(kind: Optional[Kind] = None) -> List[ResourceItem]:
+def iter_items(kind: Optional[TagType] = None) -> List[ResourceItem]:
     """Return items, optionally filtered by kind."""
     if kind is None:
         return list(DEFAULT_CATALOG.items)
@@ -591,5 +622,5 @@ def get_catalog_manifest() -> Dict[str, str]:
         "library_tag": DEFAULT_CATALOG.library_tag,
         "version": str(DEFAULT_CATALOG.version),
         "digest": DEFAULT_CATALOG.digest or "",
-        "created_at": DEFAULT_CATALOG.created_at,
+        "created_at": str(DEFAULT_CATALOG.created_at),
     }

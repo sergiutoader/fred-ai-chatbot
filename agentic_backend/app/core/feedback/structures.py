@@ -16,7 +16,7 @@ from fred_core import BaseModelWithId
 from pydantic import Field
 from datetime import datetime
 from typing import Optional
-
+from fred_core import utc_now
 
 class FeedbackRecord(BaseModelWithId):
     session_id: str = Field(..., description="Session ID associated with the feedback")
@@ -28,9 +28,8 @@ class FeedbackRecord(BaseModelWithId):
     comment: Optional[str] = Field(
         None, description="Optional user comment or clarification"
     )
-    created_at: datetime = Field(
-        ..., description="Timestamp when the feedback was submitted"
-    )
+    created_at: datetime = Field(default_factory=lambda:utc_now(), description="Timestamp when feedback was created")
+
     user_id: str = Field(..., description="Optional user ID if identity is tracked")
 
     class Config:

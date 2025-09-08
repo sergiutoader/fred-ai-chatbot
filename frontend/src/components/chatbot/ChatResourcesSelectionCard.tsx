@@ -21,7 +21,6 @@ import {
   useListAllTagsKnowledgeFlowV1TagsGetQuery,
   useListResourcesByKindKnowledgeFlowV1ResourcesGetQuery,
   Resource,
-  ResourceKind,
 } from "../../slices/knowledgeFlow/knowledgeFlowOpenApi";
 
 export interface ResourceLibrariesSelectionCardProps {
@@ -43,7 +42,7 @@ export function ChatResourcesSelectionCard({
   const { data: tags = [], isLoading, isError } = useListAllTagsKnowledgeFlowV1TagsGetQuery({ type: libraryType });
 
   // Fetch resources of that kind
-  const resourceKind: ResourceKind | undefined =
+  const resourceKind: TagType | undefined =
     libraryType === "prompt" ? "prompt" : libraryType === "template" ? "template" : undefined;
 
   const { data: fetchedResources = [] } =

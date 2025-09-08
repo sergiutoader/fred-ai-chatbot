@@ -7,9 +7,8 @@ from __future__ import annotations
 import inspect
 import json
 import logging
-from datetime import datetime, timezone
 from typing import Awaitable, Callable, List
-
+from fred_core import utc_now
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
@@ -37,11 +36,6 @@ logger = logging.getLogger(__name__)
 
 # WS callback type (sync or async)
 CallbackType = Callable[[dict], None] | Callable[[dict], Awaitable[None]]
-
-
-def _utcnow_dt():
-    """UTC timestamp (seconds precision) for ISO-8601 serialization."""
-    return datetime.now(timezone.utc).replace(microsecond=0)
 
 
 class StreamTranscoder:
@@ -117,7 +111,7 @@ class StreamTranscoder:
                             session_id=session_id,
                             exchange_id=exchange_id,
                             rank=base_rank + seq,
-                            timestamp=_utcnow_dt(),
+                            timestamp=utc_now(),
                             role=Role.assistant,
                             channel=Channel.tool_call,
                             parts=[
@@ -157,7 +151,7 @@ class StreamTranscoder:
                         session_id=session_id,
                         exchange_id=exchange_id,
                         rank=base_rank + seq,
-                        timestamp=_utcnow_dt(),
+                        timestamp=utc_now(),
                         role=Role.tool,
                         channel=Channel.tool_result,
                         parts=[
@@ -205,7 +199,7 @@ class StreamTranscoder:
                             session_id=session_id,
                             exchange_id=exchange_id,
                             rank=base_rank + seq,
-                            timestamp=_utcnow_dt(),
+                            timestamp=utc_now(),
                             role=Role.assistant,
                             channel=Channel.thought,
                             parts=[TextPart(text=str(thought_txt))],
@@ -247,7 +241,7 @@ class StreamTranscoder:
                     session_id=session_id,
                     exchange_id=exchange_id,
                     rank=base_rank + seq,
-                    timestamp=_utcnow_dt(),
+                    timestamp=utc_now(),
                     role=role,
                     channel=ch,
                     parts=parts or [TextPart(text="")],

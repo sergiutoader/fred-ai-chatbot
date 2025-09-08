@@ -203,8 +203,8 @@ export type FeedbackRecord = {
   rating: number;
   /** Optional user comment or clarification */
   comment?: string | null;
-  /** Timestamp when the feedback was submitted */
-  created_at: string;
+  /** Timestamp when feedback was created */
+  created_at?: string;
   /** Optional user ID if identity is tracked */
   user_id: string;
 };

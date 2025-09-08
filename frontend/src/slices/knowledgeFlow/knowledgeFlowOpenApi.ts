@@ -221,27 +221,27 @@ const injectedRtkApi = api.injectEndpoints({
         },
       }),
     }),
-    updateResourceKnowledgeFlowV1ResourcesResourceIdPut: build.mutation<
-      UpdateResourceKnowledgeFlowV1ResourcesResourceIdPutApiResponse,
-      UpdateResourceKnowledgeFlowV1ResourcesResourceIdPutApiArg
+    updateResourceKnowledgeFlowV1ResourcesIdPut: build.mutation<
+      UpdateResourceKnowledgeFlowV1ResourcesIdPutApiResponse,
+      UpdateResourceKnowledgeFlowV1ResourcesIdPutApiArg
     >({
       query: (queryArg) => ({
-        url: `/knowledge-flow/v1/resources/${queryArg.resourceId}`,
+        url: `/knowledge-flow/v1/resources/${queryArg.id}`,
         method: "PUT",
         body: queryArg.resourceUpdate,
       }),
     }),
-    getResourceKnowledgeFlowV1ResourcesResourceIdGet: build.query<
-      GetResourceKnowledgeFlowV1ResourcesResourceIdGetApiResponse,
-      GetResourceKnowledgeFlowV1ResourcesResourceIdGetApiArg
+    getResourceKnowledgeFlowV1ResourcesIdGet: build.query<
+      GetResourceKnowledgeFlowV1ResourcesIdGetApiResponse,
+      GetResourceKnowledgeFlowV1ResourcesIdGetApiArg
     >({
-      query: (queryArg) => ({ url: `/knowledge-flow/v1/resources/${queryArg.resourceId}` }),
+      query: (queryArg) => ({ url: `/knowledge-flow/v1/resources/${queryArg.id}` }),
     }),
-    deleteResourceKnowledgeFlowV1ResourcesResourceIdDelete: build.mutation<
-      DeleteResourceKnowledgeFlowV1ResourcesResourceIdDeleteApiResponse,
-      DeleteResourceKnowledgeFlowV1ResourcesResourceIdDeleteApiArg
+    deleteResourceKnowledgeFlowV1ResourcesIdDelete: build.mutation<
+      DeleteResourceKnowledgeFlowV1ResourcesIdDeleteApiResponse,
+      DeleteResourceKnowledgeFlowV1ResourcesIdDeleteApiArg
     >({
-      query: (queryArg) => ({ url: `/knowledge-flow/v1/resources/${queryArg.resourceId}`, method: "DELETE" }),
+      query: (queryArg) => ({ url: `/knowledge-flow/v1/resources/${queryArg.id}`, method: "DELETE" }),
     }),
     searchDocumentsUsingVectorization: build.mutation<
       SearchDocumentsUsingVectorizationApiResponse,
@@ -481,23 +481,20 @@ export type ListResourcesByKindKnowledgeFlowV1ResourcesGetApiResponse =
   /** status 200 Successful Response */ Resource[];
 export type ListResourcesByKindKnowledgeFlowV1ResourcesGetApiArg = {
   /** prompt | template */
-  kind: ResourceKind;
+  kind: TagType;
 };
-export type UpdateResourceKnowledgeFlowV1ResourcesResourceIdPutApiResponse =
-  /** status 200 Successful Response */ Resource;
-export type UpdateResourceKnowledgeFlowV1ResourcesResourceIdPutApiArg = {
-  resourceId: string;
+export type UpdateResourceKnowledgeFlowV1ResourcesIdPutApiResponse = /** status 200 Successful Response */ Resource;
+export type UpdateResourceKnowledgeFlowV1ResourcesIdPutApiArg = {
+  id: string;
   resourceUpdate: ResourceUpdate;
 };
-export type GetResourceKnowledgeFlowV1ResourcesResourceIdGetApiResponse =
-  /** status 200 Successful Response */ Resource;
-export type GetResourceKnowledgeFlowV1ResourcesResourceIdGetApiArg = {
-  resourceId: string;
+export type GetResourceKnowledgeFlowV1ResourcesIdGetApiResponse = /** status 200 Successful Response */ Resource;
+export type GetResourceKnowledgeFlowV1ResourcesIdGetApiArg = {
+  id: string;
 };
-export type DeleteResourceKnowledgeFlowV1ResourcesResourceIdDeleteApiResponse =
-  /** status 200 Successful Response */ any;
-export type DeleteResourceKnowledgeFlowV1ResourcesResourceIdDeleteApiArg = {
-  resourceId: string;
+export type DeleteResourceKnowledgeFlowV1ResourcesIdDeleteApiResponse = /** status 200 Successful Response */ any;
+export type DeleteResourceKnowledgeFlowV1ResourcesIdDeleteApiArg = {
+  id: string;
 };
 export type SearchDocumentsUsingVectorizationApiResponse = /** status 200 Successful Response */ VectorSearchHit[];
 export type SearchDocumentsUsingVectorizationApiArg = {
@@ -706,11 +703,19 @@ export type TabularQueryResponse = {
 export type RawSqlRequest = {
   query: string;
 };
-export type TagType = "document" | "prompt" | "template" | "agent" | "mcp";
+export type TagType =
+  | "document"
+  | "prompt"
+  | "template"
+  | "policy"
+  | "tool_instruction"
+  | "agent"
+  | "agent_binding"
+  | "mcp";
 export type TagWithItemsId = {
   id: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   owner_id: string;
   name: string;
   path?: string | null;
@@ -732,24 +737,23 @@ export type TagUpdate = {
   type: TagType;
   item_ids?: string[];
 };
-export type ResourceKind = "mcp" | "agent" | "prompt" | "template";
 export type Resource = {
   id: string;
-  kind: ResourceKind;
+  kind: TagType;
   version: string;
-  name?: string | null;
+  name: string;
   description?: string | null;
   labels?: string[] | null;
   author: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   /** Raw YAML text or other content */
   content: string;
   /** List of tags associated with the resource */
   library_tags: string[];
 };
 export type ResourceCreate = {
-  kind: ResourceKind;
+  kind: TagType;
   content: string;
   name?: string | null;
   description?: string | null;
@@ -931,10 +935,10 @@ export const {
   useCreateResourceKnowledgeFlowV1ResourcesPostMutation,
   useListResourcesByKindKnowledgeFlowV1ResourcesGetQuery,
   useLazyListResourcesByKindKnowledgeFlowV1ResourcesGetQuery,
-  useUpdateResourceKnowledgeFlowV1ResourcesResourceIdPutMutation,
-  useGetResourceKnowledgeFlowV1ResourcesResourceIdGetQuery,
-  useLazyGetResourceKnowledgeFlowV1ResourcesResourceIdGetQuery,
-  useDeleteResourceKnowledgeFlowV1ResourcesResourceIdDeleteMutation,
+  useUpdateResourceKnowledgeFlowV1ResourcesIdPutMutation,
+  useGetResourceKnowledgeFlowV1ResourcesIdGetQuery,
+  useLazyGetResourceKnowledgeFlowV1ResourcesIdGetQuery,
+  useDeleteResourceKnowledgeFlowV1ResourcesIdDeleteMutation,
   useSearchDocumentsUsingVectorizationMutation,
   useQueryKnowledgeFlowV1KpiQueryPostMutation,
   useOsHealthQuery,

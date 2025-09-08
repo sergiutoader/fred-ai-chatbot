@@ -14,8 +14,8 @@
 
 from abc import ABC, abstractmethod
 from typing import List
-
-from app.features.resources.structures import Resource, ResourceKind
+from fred_core import TagType
+from app.features.resources.structures import Resource
 
 
 class ResourceNotFoundError(Exception):
@@ -43,8 +43,14 @@ class BaseResourceStore(ABC):
     """
 
     @abstractmethod
-    def get_all_resources(self, kind: ResourceKind) -> list[Resource]:
+    def get_all_resources(self, kind: TagType) -> list[Resource]:
         pass
+
+    def resource_exists(self, *, name: str, kind: TagType, library_tag_id: str) -> bool:
+        """
+        Checks if a resource with the given name, kind, and library tag ID already exists.
+        """
+        raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
     def get_resource_by_id(self, id: str) -> Resource:
@@ -55,11 +61,11 @@ class BaseResourceStore(ABC):
         pass
 
     @abstractmethod
-    def update_resource(self, resource_id: str, resource: Resource) -> Resource:
+    def update_resource(self, id: str, resource: Resource) -> Resource:
         pass
 
     @abstractmethod
-    def delete_resource(self, resource_id: str) -> None:
+    def delete_resource(self, id: str) -> None:
         pass
 
     @abstractmethod
@@ -70,3 +76,11 @@ class BaseResourceStore(ABC):
             ResourceNotFoundError: If no resources are found for the tag.
         """
         pass
+
+    @abstractmethod
+    def search(self, *, name: str, kind: TagType, library_tag_name: str) -> List[Resource]:
+        """
+        Search for resources based on name, kind, and library tag name.
+        Returns a list of resource dictionaries matching the criteria.
+        """
+        pass    

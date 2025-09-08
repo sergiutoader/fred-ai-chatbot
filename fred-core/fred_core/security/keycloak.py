@@ -24,9 +24,8 @@ import jwt
 from fastapi import HTTPException, Security
 from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWKClient
-
 from fred_core.security.structure import SecurityConfiguration, KeycloakUser
-
+from fred_core.common.timestamp import timestamp
 logger = logging.getLogger(__name__)
 
 # --- runtime toggles ------------------
@@ -60,10 +59,15 @@ def _peek_header_and_claims(token: str) -> Tuple[Dict[str, Any], Dict[str, Any]]
 
 
 def _iso(ts: int | float | None) -> str | None:
+    """
+    Convert epoch seconds -> ISO-8601 UTC 'Z' using Fred's single time primitive.
+    Safe for logs; returns None on bad input.
+    """
     if ts is None:
         return None
     try:
-        return datetime.fromtimestamp(float(ts), tz=timezone.utc).isoformat()
+        dt = datetime.fromtimestamp(float(ts), tz=timezone.utc)
+        return timestamp(dt)  # -> 'YYYY-MM-DDTHH:MM:SSZ'
     except Exception:
         return None
 

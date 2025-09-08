@@ -20,7 +20,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_validator
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
+from fred_core import timestamp
 
 
 class SourceType(str, Enum):
@@ -64,14 +65,22 @@ class Identity(BaseModel):
     modified: Optional[datetime] = None
     last_modified_by: Optional[str] = None
 
-    @field_validator("created", "modified")
+    # always serialize datetimes via our canonical helper
+    model_config = ConfigDict(
+        json_encoders={datetime: lambda dt: timestamp(dt)},
+    )
+
+    @field_validator("created", "modified", mode="before")
     @classmethod
-    def _ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+    def _normalize_dt(cls, v: Optional[datetime | str]) -> Optional[datetime]:
+        """
+        Ensure that datetime/string inputs are normalized to aware UTC datetimes.
+        - Accepts None, datetime (naive or aware), or ISO string.
+        - Always returns tz-aware UTC datetime (seconds precision).
+        """
         if v is None:
             return None
-        if v.tzinfo is None:
-            return v.replace(tzinfo=timezone.utc)
-        return v
+        return timestamp(v, as_datetime=True)
 
     @property
     def stem(self) -> str:

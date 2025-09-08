@@ -18,7 +18,7 @@ from __future__ import annotations
 import time
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, Iterable, Optional, Callable
 
 from fred_core.kpi.base_kpi_store import BaseKPIStore
@@ -82,11 +82,6 @@ def _merge_dims(defaults: KPIDefaults | None, dims: Optional[Dims]) -> Dims:
     if dims:
         out.update({k: v for k, v in dims.items() if v is not None})
     return out
-
-
-def _now_iso() -> str:
-    """UTC timestamp (ISO 8601). Useful when an explicit @timestamp is required."""
-    return datetime.now(timezone.utc).isoformat()
 
 
 def to_kpi_actor(user: KeycloakUser) -> KPIActor:

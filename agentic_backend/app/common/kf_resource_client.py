@@ -43,10 +43,10 @@ class KfResourceClient(KfBaseClient):
         data = self._json_or_none(resp) or []
         return data if isinstance(data, list) else []
 
-    def get_resource(self, resource_id: str) -> Optional[Dict[str, Any]]:
+    def get_resource(self, id: str) -> Optional[Dict[str, Any]]:
         """GET /resources/{id}. Returns None on 404; raises otherwise."""
         try:
-            resp = self._get(f"/resources/{resource_id}")
+            resp = self._get(f"/resources/{id}")
         except (requests.ConnectionError, requests.Timeout) as e:
             raise KfServiceUnavailable(str(e)) from e
 

@@ -21,7 +21,7 @@ from fastapi.params import Query
 
 from app.core.stores.tags.base_tag_store import TagAlreadyExistsError, TagNotFoundError
 from app.features.metadata.service import MetadataNotFound
-from app.features.tag.service import TagService
+from app.features.tag.tag_service import TagService
 from app.features.tag.structure import TagCreate, TagUpdate, TagWithItemsId, TagType
 from fred_core import KeycloakUser, get_current_user
 

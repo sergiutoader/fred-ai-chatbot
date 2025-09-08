@@ -16,7 +16,7 @@ import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from fred_core import KeycloakUser, get_current_user, raise_internal_error
+from fred_core import KeycloakUser, get_current_user
 from temporalio.client import Client
 
 from app.application_context import ApplicationContext
@@ -69,7 +69,7 @@ class SchedulerController:
                 result = await run_ingestion_pipeline(definition)
                 return {"status": result}
             except Exception as e:
-                raise_internal_error(logger, "Failed to submit process-documents workflow", e)
+                log_exception(e, "Failed to submit process-documents workflow")
 
         @router.post(
             "/schedule-documents",

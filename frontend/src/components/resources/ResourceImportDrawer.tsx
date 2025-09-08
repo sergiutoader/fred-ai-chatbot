@@ -6,7 +6,7 @@ import { Box, Button, Drawer, Paper, Stack, Typography, useTheme } from "@mui/ma
 import UploadIcon from "@mui/icons-material/Upload";
 import SaveIcon from "@mui/icons-material/Save";
 import { useTranslation } from "react-i18next";
-import { ResourceKind } from "../../slices/knowledgeFlow/knowledgeFlowOpenApi";
+import { TagType } from "../../slices/knowledgeFlow/knowledgeFlowOpenApi";
 import { useResourceCommands } from "./useResourceCommands";
 import { useToast } from "../ToastProvider";
 
@@ -15,7 +15,7 @@ type Props = {
   onClose: () => void;
   onImportComplete?: () => void;
   libraryTagId: string | null;
-  kind: ResourceKind; // "prompt" | "template" — trusted
+  kind: TagType; // "prompt" | "template" — trusted
 };
 
 const regexName = /^\s*name\s*:\s*(.+)\s*$/im;

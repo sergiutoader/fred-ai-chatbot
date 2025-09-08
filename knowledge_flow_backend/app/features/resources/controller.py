@@ -26,7 +26,8 @@ from app.core.stores.resources.base_resource_store import (
     ResourceAlreadyExistsError,
 )
 from app.features.resources.service import ResourceService
-from app.features.resources.structures import Resource, ResourceCreate, ResourceKind, ResourceUpdate
+from app.features.resources.structures import Resource, ResourceCreate, ResourceUpdate
+from fred_core import TagType
 
 logger = logging.getLogger(__name__)
 
@@ -88,24 +89,24 @@ class ResourceController:
                 raise handle_exception(e)
 
         @router.put(
-            "/resources/{resource_id}",
+            "/resources/{id}",
             tags=["Resources"],
             response_model=Resource,
             response_model_exclude_none=True,
             summary="Update a resource (content/metadata).",
         )
         async def update_resource(
-            resource_id: str,
+            id: str,
             payload: ResourceUpdate = Body(...),
             user: KeycloakUser = Depends(get_current_user),
         ) -> Resource:
             try:
-                return self.service.update(resource_id=resource_id, payload=payload, user=user)
+                return self.service.update(id=id, payload=payload, user=user)
             except Exception as e:
                 raise handle_exception(e)
 
         @router.get(
-            "/resources/{resource_id}",
+            "/resources/{id}",
             tags=["Resources"],
             response_model=Resource,
             response_model_exclude_none=True,
@@ -121,6 +122,26 @@ class ResourceController:
                 raise handle_exception(e)
 
         @router.get(
+            "/resources/search",
+            tags=["Resources"],
+            response_model=List[Resource],
+            response_model_exclude_none=True,
+            summary="Search for resources by name, kind, and library tag.",
+        )
+        async def search_resources(
+            name: Annotated[str, Query(description="The unique name of the resource (e.g., 'agent.system/generalist')")],
+            kind: Annotated[TagType, Query(description="The kind of resource (e.g., 'prompt', 'agent_binding')")],
+            library_tag_name: Annotated[str, Query(description="The library tag name to scope the search")],
+            user: KeycloakUser = Depends(get_current_user),
+        ) -> List[Resource]:
+            try:
+                return self.service.search_resources(
+                    name=name, kind=kind, library_tag_name=library_tag_name
+                )
+            except Exception as e:
+                raise handle_exception(e)
+
+        @router.get(
             "/resources",
             tags=["Resources"],
             response_model=List[Resource],
@@ -128,7 +149,7 @@ class ResourceController:
             summary="List all resources for a kind (prompt|template).",
         )
         async def list_resources_by_kind(
-            kind: Annotated[ResourceKind, Query(description="prompt | template")],
+            kind: Annotated[TagType, Query(description="prompt | template | policy | agent_binding | mcp | agent | tool_instruction | document")] = TagType.PROMPT,
             user: KeycloakUser = Depends(get_current_user),
         ) -> List[Resource]:
             try:
@@ -137,15 +158,15 @@ class ResourceController:
                 raise handle_exception(e)
 
         @router.delete(
-            "/resources/{resource_id}",
+            "/resources/{id}",
             tags=["Resources"],
             summary="Delete a resource by id.",
         )
         async def delete_resource(
-            resource_id: str,
+            id: str,
             user: KeycloakUser = Depends(get_current_user),
         ) -> None:
             try:
-                self.service.delete(resource_id=resource_id)
+                self.service.delete(id=id)
             except Exception as e:
                 raise handle_exception(e)

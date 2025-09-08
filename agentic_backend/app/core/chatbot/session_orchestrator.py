@@ -8,14 +8,13 @@ import asyncio
 import logging
 import secrets
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Awaitable, Callable, List, Optional, Tuple
 from uuid import uuid4
 
 from fastapi import UploadFile
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-
+from fred_core import KPIWriter, KPIActor, utc_now
 from app.application_context import (
     get_configuration,
     get_default_model,
@@ -38,18 +37,12 @@ from app.core.chatbot.metric_structures import MetricsResponse
 from app.core.chatbot.stream_transcoder import StreamTranscoder
 from app.core.session.attachement_processing import AttachementProcessing
 from app.core.session.stores.base_session_store import BaseSessionStore
-from fred_core import KPIWriter, KPIActor
+
 
 logger = logging.getLogger(__name__)
 
 # Callback type used by WS controller to push events to clients
 CallbackType = Callable[[dict], None] | Callable[[dict], Awaitable[None]]
-
-
-def _utcnow_dt() -> datetime:
-    """UTC timestamp (seconds resolution) for ISO-8601 serialization."""
-    return datetime.now(timezone.utc).replace(microsecond=0)
-
 
 class SessionOrchestrator:
     """
@@ -141,7 +134,7 @@ class SessionOrchestrator:
             session_id=session.id,
             exchange_id=exchange_id,
             rank=base_rank,
-            timestamp=_utcnow_dt(),
+            timestamp=utc_now(),
             role=Role.user,
             channel=Channel.final,
             parts=[TextPart(text=message)],
@@ -199,7 +192,7 @@ class SessionOrchestrator:
             )
 
         # 4) Persist session + history
-        session.updated_at = _utcnow_dt()
+        session.updated_at = utc_now()
         self.session_store.save(session)
         assert session.user_id == user_id, "Session/user mismatch"
         self.history_store.save(session.id, prior + all_msgs, user_id)
@@ -370,7 +363,7 @@ class SessionOrchestrator:
             .content
         )
         session = SessionSchema(
-            id=new_session_id, user_id=user_id, title=title, updated_at=_utcnow_dt()
+            id=new_session_id, user_id=user_id, title=title, updated_at=utc_now()
         )
         self.session_store.save(session)
         logger.info("Created new session %s for user %s", new_session_id, user_id)

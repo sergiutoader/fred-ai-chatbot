@@ -13,29 +13,10 @@
 # limitations under the License.
 
 from datetime import datetime
-from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
-from fred_core import BaseModelWithId
-
-
-class ResourceKind(str, Enum):
-    """
-    Resource kinds supported in fred-core. A resource is a piece of content
-    such as a prompt, template, policy, tool instruction, or agent binding.
-    They are encoded using a flexible YAML front-matter + body format.
-
-    Note: some kinds (agent_binding, agent) are structural and do not require a body.
-    """
-
-    PROMPT = "prompt"
-    TEMPLATE = "template"
-    POLICY = "policy"
-    TOOL_INSTRUCTION = "tool_instruction"
-    AGENT = "agent"
-    AGENT_BINDING = "agent_binding"
-    MCP = "mcp"
+from fred_core import BaseModelWithId, TagType, timestamp
 
 
 class ResourceUpdate(BaseModel):
@@ -56,7 +37,7 @@ class ResourceCreate(BaseModel):
     input_schema and output_schema as applicable, and the body if required by kind.
     """
 
-    kind: ResourceKind
+    kind: TagType
     content: str
     name: Optional[str] = None
     description: Optional[str] = None
@@ -69,13 +50,13 @@ class Resource(BaseModelWithId):
     The 'content' field includes the full YAML front-matter + body.
     """
 
-    kind: ResourceKind
+    kind: TagType
     version: str
     name: str
     description: Optional[str] = None
     labels: Optional[List[str]] = None
     author: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime = Field(default_factory=lambda: timestamp(as_datetime=True))
+    updated_at: datetime = Field(default_factory=lambda: timestamp(as_datetime=True))
     content: str = Field(..., description="Raw YAML text or other content")
     library_tags: List[str] = Field(..., description="List of tags associated with the resource")

@@ -42,6 +42,10 @@ def _session_with_retries() -> requests.Session:
 class KfServiceUnavailable(Exception):
     """Knowledge Flow unreachable (DNS/conn/timeout)."""
 
+class KfResourceNotFoundError(Exception):
+    """Raised when a resource is not found."""
+
+    pass
 
 class KfBaseClient:
     """

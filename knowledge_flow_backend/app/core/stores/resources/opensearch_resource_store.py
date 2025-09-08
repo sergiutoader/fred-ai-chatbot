@@ -1,7 +1,7 @@
 import logging
-from typing import List
+from typing import Any, Dict, List
 
-from fred_core import ThreadSafeLRUCache
+from fred_core import ThreadSafeLRUCache, TagType
 from opensearchpy import OpenSearch, NotFoundError, ConflictError, RequestsHttpConnection
 
 from app.core.stores.resources.base_resource_store import (
@@ -9,7 +9,7 @@ from app.core.stores.resources.base_resource_store import (
     ResourceAlreadyExistsError,
     ResourceNotFoundError,
 )
-from app.features.resources.structures import Resource, ResourceKind
+from app.features.resources.structures import Resource
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ RESOURCES_INDEX_MAPPING = {
             "name": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
             "description": {"type": "text"},
             "content": {"type": "text"},
-            "tags": {"type": "keyword"},
+            "library_tags": {"type": "keyword"},
             "owner_id": {"type": "keyword"},
             "created_at": {"type": "date"},
             "updated_at": {"type": "date"},
@@ -57,7 +57,7 @@ class OpenSearchResourceStore(BaseResourceStore):
         else:
             logger.info(f"[RESOURCES] OpenSearch index '{self.index_name}' already exists.")
 
-    def list_resources_for_user(self, user: str, kind: ResourceKind) -> List[Resource]:
+    def list_resources_for_user(self, user: str, kind: TagType) -> List[Resource]:
         try:
             q = {"query": {"bool": {"must": [{"term": {"owner_id": user}}, {"term": {"kind": kind}}]}}}
             resp = self.client.search(index=self.index_name, body=q, params={"size": 10000})
@@ -66,7 +66,7 @@ class OpenSearchResourceStore(BaseResourceStore):
             logger.error(f"[RESOURCES] Failed to list {kind}s for user '{user}': {e}")
             raise
 
-    def get_all_resources(self, kind: ResourceKind) -> List[Resource]:
+    def get_all_resources(self, kind: TagType) -> List[Resource]:
         try:
             q = {"query": {"term": {"kind": kind}}}
             resp = self.client.search(index=self.index_name, body=q, params={"size": 10000})
@@ -103,37 +103,37 @@ class OpenSearchResourceStore(BaseResourceStore):
             logger.error(f"[RESOURCES] Failed to create {resource.kind} '{resource.id}': {e}")
             raise
 
-    def update_resource(self, resource_id: str, resource: Resource) -> Resource:
+    def update_resource(self, id: str, resource: Resource) -> Resource:
         try:
-            self.get_resource_by_id(resource_id)  # ensure exists
+            self.get_resource_by_id(id)  # ensure exists
             self.client.index(
                 index=self.index_name,
-                id=resource_id,
+                id=id,
                 body=resource.model_dump(mode="json"),
             )
             self._cache.set(resource.id, resource)
-            logger.info(f"[RESOURCES] Updated resource '{resource_id}'")
+            logger.info(f"[RESOURCES] Updated resource '{id}'")
             return resource
         except ResourceNotFoundError:
             raise
         except Exception as e:
-            logger.error(f"[RESOURCES] Failed to update {resource.kind} '{resource_id}': {e}")
+            logger.error(f"[RESOURCES] Failed to update {resource.kind} '{id}': {e}")
             raise
 
-    def delete_resource(self, resource_id: str) -> None:
-        self._cache.delete(resource_id)
+    def delete_resource(self, id: str) -> None:
+        self._cache.delete(id)
         try:
-            self.client.delete(index=self.index_name, id=resource_id)
-            logger.info(f"[RESOURCES] Deleted resource '{resource_id}'")
+            self.client.delete(index=self.index_name, id=id)
+            logger.info(f"[RESOURCES] Deleted resource '{id}'")
         except NotFoundError:
-            raise ResourceNotFoundError(f"resource with id '{resource_id}' not found.")
+            raise ResourceNotFoundError(f"resource with id '{id}' not found.")
         except Exception as e:
-            logger.error(f"[RESOURCES] Failed to delete resource '{resource_id}': {e}")
+            logger.error(f"[RESOURCES] Failed to delete resource '{id}': {e}")
             raise
 
     def get_resources_in_tag(self, tag_id: str) -> List[Resource]:
         try:
-            q = {"query": {"bool": {"must": [{"term": {"tags": tag_id}}]}}}
+            q = {"query": {"bool": {"must": [{"term": {"library_tags": tag_id}}]}}}
             resp = self.client.search(index=self.index_name, body=q, params={"size": 10000})
             if not resp["hits"]["hits"]:
                 raise ResourceNotFoundError(f"No resource found for tag '{tag_id}'")
@@ -143,3 +143,72 @@ class OpenSearchResourceStore(BaseResourceStore):
         except Exception as e:
             logger.error(f"[RESOURCES] Failed to get resources for tag '{tag_id}': {e}")
             raise
+
+    def resource_exists(self, *, name: str, kind: TagType, library_tag_id: str) -> bool:
+        """
+        Fred note (WHY this method is noisy now):
+        - We're investigating why existence checks always return false.
+        - We log *everything*: the normalized kind value, the query body, 
+        and the raw response from OpenSearch.
+        - Once stable, we can reduce this to a single debug/info line.
+        """
+        kind_value = kind.value  # Make enum explicit
+        logger.debug(f"[RESOURCES] Checking existence for name='{name}', kind='{kind_value}', library_tag_id='{library_tag_id}'")
+
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"name.keyword": name}},
+                        {"term": {"kind": kind_value}},
+                        {"term": {"library_tags": library_tag_id}},
+                    ]
+                }
+            },
+            "size": 1,
+            "_source": True,  # show the hit’s source in logs for investigation
+        }
+
+        logger.debug(f"[RESOURCES] Query body for existence check:\n{query}")
+
+        try:
+            resp = self.client.search(index=self.index_name, body=query)
+            logger.debug(f"[RESOURCES] Raw search response: {resp}")
+
+            hits = resp.get("hits", {}).get("hits", [])
+            logger.debug(f"[RESOURCES] Number of hits: {len(hits)}")
+
+            if hits:
+                logger.debug(f"[RESOURCES] First hit _source: {hits[0].get('_source')}")
+                return True
+            else:
+                logger.debug("[RESOURCES] No hits found → returning False")
+                return False
+            
+        except Exception as e:
+            logger.error(
+                f"[RESOURCES] Exception during existence check for "
+                f"name='{name}', kind='{kind_value}', library_tag_id='{library_tag_id}': {e}"
+            )
+            raise
+
+        
+    def search(self, *, name: str, kind: TagType, library_tag_name: str) -> List[Resource]:
+        """
+        Executes a precise search for resources based on name, kind, and library tag name.
+        """
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"name.keyword": name}},
+                        {"term": {"kind": kind.value}},
+                        {"term": {"library_tags": library_tag_name}}  # Search for the logical name
+                    ]
+                }
+            }
+        }
+        
+        resp = self.client.search(index=self.index_name, body=query)
+        return [Resource(**hit["_source"]) for hit in resp.get("hits", {}).get("hits", [])]
+

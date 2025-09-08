@@ -17,10 +17,8 @@ from pathlib import Path
 from typing import Annotated, Literal, Optional, Union
 from pydantic import BaseModel, Field, model_validator
 
-
 class BaseModelWithId(BaseModel):
     id: str
-
 
 class OpenSearchStoreConfig(BaseModel):
     host: str = Field(..., description="OpenSearch host URL")

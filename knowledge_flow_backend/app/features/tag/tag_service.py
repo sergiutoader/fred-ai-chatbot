@@ -22,33 +22,10 @@ from app.common.document_structures import DocumentMetadata
 from app.core.stores.tags.base_tag_store import TagAlreadyExistsError
 from app.features.metadata.service import MetadataService
 from app.features.resources.service import ResourceService
-from app.features.resources.structures import ResourceKind
-from app.features.tag.structure import Tag, TagCreate, TagType, TagUpdate, TagWithItemsId
-from fred_core import KeycloakUser
+from app.features.tag.structure import Tag, TagCreate, TagUpdate, TagWithItemsId
+from fred_core import KeycloakUser, TagType, get_system_actor
 
 logger = logging.getLogger(__name__)
-
-
-def _tagtype_to_rk(tag_type: TagType) -> ResourceKind:
-    """
-    Map TagType -> ResourceKind for resources managed by ResourceService.
-    DOCUMENT is intentionally excluded (managed by MetadataService).
-    """
-    if tag_type == TagType.PROMPT:
-        return ResourceKind.PROMPT
-    if tag_type == TagType.TEMPLATE:
-        return ResourceKind.TEMPLATE
-    if tag_type == TagType.POLICY:  # NEW
-        return ResourceKind.POLICY
-    if tag_type == TagType.TOOL_INSTRUCTION:  # NEW
-        return ResourceKind.TOOL_INSTRUCTION
-    if tag_type == TagType.AGENT:
-        return ResourceKind.AGENT
-    if tag_type == TagType.AGENT_BINDING:  # NEW
-        return ResourceKind.AGENT_BINDING
-    if tag_type == TagType.MCP:
-        return ResourceKind.MCP
-    raise ValueError(f"Unsupported TagType for resources: {tag_type}")
 
 
 class TagService:
@@ -77,8 +54,11 @@ class TagService:
         List user tags, optionally filtered by type and hierarchical prefix (e.g. 'Sales' or 'Sales/HR').
         Pagination included.
         """
-        # 1) fetch
+        # 1) fetch the user tags plus the system tags that are visible to all.
         tags: list[Tag] = self._tag_store.list_tags_for_user(user)
+        system_tags = self._tag_store.list_tags_for_user(get_system_actor())
+        seen = {t.id for t in tags}
+        tags.extend([t for t in system_tags if t.id not in seen])
 
         # 2) filter by type
         if tag_type is not None:
@@ -102,8 +82,7 @@ class TagService:
             if tag.type == TagType.DOCUMENT:
                 item_ids = self._retrieve_document_ids_for_tag(tag.id)
             elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
-                rk = _tagtype_to_rk(tag.type)
-                item_ids = self.resource_service.get_resource_ids_for_tag(rk, tag.id)
+                item_ids = self.resource_service.get_resource_ids_for_tag(tag.type, tag.id)
             else:
                 raise ValueError(f"Unsupported tag type: {tag.type}")
             result.append(TagWithItemsId.from_tag(tag, item_ids))
@@ -113,9 +92,8 @@ class TagService:
         tag = self._tag_store.get_tag_by_id(tag_id)
         if tag.type == TagType.DOCUMENT:
             item_ids = self._retrieve_document_ids_for_tag(tag_id)
-        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
-            rk = _tagtype_to_rk(tag.type)
-            item_ids = self.resource_service.get_resource_ids_for_tag(rk, tag.id)
+        elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP, TagType.POLICY, TagType.TOOL_INSTRUCTION):
+            item_ids = self.resource_service.get_resource_ids_for_tag(tag.type, tag.id)
         else:
             raise ValueError(f"Unsupported tag type: {tag.type}")
         return TagWithItemsId.from_tag(tag, item_ids)
@@ -137,13 +115,10 @@ class TagService:
         full_path = self._compose_full_path(norm_path, tag_data.name)
         self._ensure_unique_full_path(owner_id=user.uid, tag_type=tag_data.type, full_path=full_path)
 
-        now = datetime.now()
         tag = self._tag_store.create_tag(
             Tag(
                 id=str(uuid4()),
                 owner_id=user.uid,
-                created_at=now,
-                updated_at=now,
                 name=tag_data.name,
                 path=norm_path,
                 description=tag_data.description,
@@ -160,15 +135,92 @@ class TagService:
                     modified_by=user.username,
                 )
         elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP, TagType.POLICY, TagType.TOOL_INSTRUCTION):
-            rk = _tagtype_to_rk(tag.type)
             for rid in tag_data.item_ids:
                 try:
                     self.resource_service.add_tag_to_resource(rid, tag.id)
                 except Exception as e:
-                    logger.warning(f"Failed to attach tag {tag.id} to {rk} resource {rid}: {e}")
+                    logger.warning(f"Failed to attach tag {tag.id} to {tag.type} resource {rid}: {e}")
                     raise
 
         return TagWithItemsId.from_tag(tag, tag_data.item_ids)
+
+    # ---------- Convenience: get-or-create with (user, type, name) ----------
+
+    def ensure_tag(self, user: KeycloakUser, tag_type: TagType, name: str) -> Tag:
+        """
+        Ensure a tag exists for (user, tag_type) identified by 'name'.
+
+        Usage:
+          - name = "default"            -> ensures a root tag "Default"
+          - name = "prompts/default"    -> ensures tag 'Default' under path 'Prompts'
+
+        Fred rationale (kept intentionally simple for bootstrap/config flows):
+          - Hierarchy is supported when 'name' contains '/', otherwise the tag is created/located at root.
+          - Enforces: a user cannot have several tags with the same leaf name (regardless of path).
+            * If the caller passes a full path, we match on (owner_id, type, full_path) first.
+            * If only a leaf is given, we scan user's tags of that type:
+                - If exactly one tag has that leaf -> return it.
+                - If more than one exists (shouldn't happen with your invariant) -> raise TagAlreadyExistsError.
+                - If none -> create at root.
+          - Race-safe: concurrent creates are resolved by re-reading after TagAlreadyExistsError.
+        """
+        # 1) parse name -> (path, leaf)
+        parts = [seg.strip() for seg in name.split("/") if seg.strip()]
+        if not parts:
+            raise ValueError("Tag name must not be empty.")
+        leaf = parts[-1]
+        path = "/".join(parts[:-1]) or None
+
+        # 2) if a full path was provided, try exact hierarchical lookup
+        if path:
+            full_path = self._compose_full_path(path, leaf)
+            existing = self._tag_store.get_by_owner_type_full_path(user.uid, tag_type, full_path)
+            if existing:
+                return existing
+            # else: create at the specified path
+            tag = Tag(
+                id=str(uuid4()),
+                owner_id=user.uid,
+                name=leaf,
+                path=path,
+                description=None,
+                type=tag_type,
+            )
+            try:
+                return self._tag_store.create_tag(tag)
+            except TagAlreadyExistsError:
+                again = self._tag_store.get_by_owner_type_full_path(user.uid, tag_type, full_path)
+                if not again:
+                    raise
+                return again
+
+        # 3) leaf-only case (root). Enforce "no duplicate leaf names for a user" invariant.
+        #    Scan user's tags for this type and same leaf.
+        user_tags = [t for t in self._tag_store.list_tags_for_user(user) if t.type == tag_type and t.name == leaf]
+        if len(user_tags) == 1:
+            return user_tags[0]
+        if len(user_tags) > 1:
+            # With your invariant this should not happen; keep it explicit.
+            raise TagAlreadyExistsError(f"Multiple tags named '{leaf}' exist for user {user.uid} and type {tag_type}; this violates the uniqueness invariant.")
+
+        # 4) Create root tag
+        tag = Tag(
+            id=str(uuid4()),
+            owner_id=user.uid,
+            name=leaf,
+            path=None,
+            description=None,
+            type=tag_type,
+        )
+        try:
+            return self._tag_store.create_tag(tag)
+        except TagAlreadyExistsError:
+            # race-safe fallback
+            full_path = leaf  # root
+            again = self._tag_store.get_by_owner_type_full_path(user.uid, tag_type, full_path)
+            if not again:
+                raise
+            return again
 
     def update_tag_for_user(self, tag_id: str, tag_data: TagUpdate, user: KeycloakUser) -> TagWithItemsId:
         tag = self._tag_store.get_tag_by_id(tag_id)
@@ -186,8 +238,7 @@ class TagService:
                 self.document_metadata_service.remove_tag_id_from_document(doc, tag.id, modified_by=user.username)
 
         elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
-            rk = _tagtype_to_rk(tag.type)
-            old_item_ids = self.resource_service.get_resource_ids_for_tag(rk, tag_id)
+            old_item_ids = self.resource_service.get_resource_ids_for_tag(tag.type, tag_id)
             added, removed = self._compute_ids_diff(old_item_ids, tag_data.item_ids)
 
             for rid in added:
@@ -211,8 +262,7 @@ class TagService:
         if tag.type == TagType.DOCUMENT:
             item_ids = self._retrieve_document_ids_for_tag(tag_id)
         elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
-            rk = _tagtype_to_rk(tag.type)
-            item_ids = self.resource_service.get_resource_ids_for_tag(rk, tag_id)
+            item_ids = self.resource_service.get_resource_ids_for_tag(tag.type, tag_id)
         else:
             item_ids = []
 
@@ -226,8 +276,7 @@ class TagService:
             for doc in documents:
                 self.document_metadata_service.remove_tag_id_from_document(doc, tag_id, modified_by=user.username)
         elif tag.type in (TagType.PROMPT, TagType.TEMPLATE, TagType.AGENT, TagType.MCP):
-            rk = _tagtype_to_rk(tag.type)
-            self.resource_service.remove_tag_from_resources(rk, tag_id)
+            self.resource_service.remove_tag_from_resources(tag.type, tag_id)
         else:
             raise ValueError(f"Unsupported tag type: {tag.type}")
 

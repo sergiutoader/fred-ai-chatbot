@@ -9,9 +9,8 @@ import logging
 from pathlib import Path
 from typing import Dict, Optional, Any, Iterable
 import json
-import datetime
 import re
-
+from fred_core import utc_now
 from app.core.processors.input.common.base_input_processor import BaseMarkdownProcessor
 
 
@@ -22,10 +21,6 @@ def _safe_read_lines(p: Path) -> Iterable[str]:
             if not line:
                 continue
             yield line
-
-
-def _now_iso() -> str:
-    return datetime.datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
 
 def _slug(s: str, maxlen: int = 96) -> str:
@@ -129,7 +124,7 @@ class JsonlMarkdownProcessor(BaseMarkdownProcessor):
             "---",
             f"title: {fm_title}",
             "source: jsonl-crawler",
-            f"created_at: {_now_iso()}",
+            f"created_at: {utc_now()}",
             f"records_total: {total}",
             f"records_used: {used}",
             f"origin_file: {file_path.name}",

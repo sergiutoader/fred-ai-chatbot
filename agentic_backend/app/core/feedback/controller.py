@@ -75,7 +75,6 @@ class FeedbackController:
                     agent_name=payload.agent_name,
                     rating=payload.rating,
                     comment=payload.comment,
-                    created_at=datetime.utcnow(),
                     user_id=user.uid,
                 )
                 self.service.add_feedback(feedback_record)

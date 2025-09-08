@@ -18,15 +18,12 @@ import logging
 from typing import Optional
 
 # Import the fred-core default catalog
-from fred_core import (
-    DEFAULT_CATALOG,
-    ResourceItem,
-    AgentBinding,
-    get_system_actor,
-)
+from fred_core import DEFAULT_CATALOG, ResourceItem, AgentBinding, get_system_actor, TagType
 
+from app.core.stores.resources.base_resource_store import ResourceAlreadyExistsError
 from app.features.resources.service import ResourceService
-from app.features.resources.structures import Resource, ResourceCreate, ResourceKind
+from app.features.resources.structures import Resource, ResourceCreate
+from app.features.tag.tag_service import TagService
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +68,6 @@ def _yaml_from_agent_binding(binding: AgentBinding) -> str:
         f"name: {binding.name}",
         "kind: agent_binding",
         "version: v1",
-        f"display_name: {binding.display_name}",
         f"system_prompt_id: {binding.system_prompt_id}",
     ]
     if binding.default_policies:
@@ -95,30 +91,11 @@ def _yaml_from_agent_binding(binding: AgentBinding) -> str:
     return f"{header}\n---\n"
 
 
-def _exists_by_name_in_library(
-    svc: ResourceService,
-    *,
-    kind: ResourceKind,
-    library_tag_id: str,
-    resource_id: str,
-) -> bool:
-    """
-    Idempotency check: does a resource with the same name already exist in this library?
-    We fetch resources for the tag and scan by name.
-    """
-    try:
-        resources: list[Resource] = svc.get_resources_for_tag(kind=kind, tag_id=library_tag_id)
-        return any((r.name or "").strip() == resource_id.strip() for r in resources)
-    except Exception:
-        logger.warning("[BOOTSTRAP] Could not list resources to check existence; will try to create.", exc_info=True)
-        return False
-
-
 def _create_resource(
-    svc: ResourceService,
+    resource_service: ResourceService,
+    tag_service: TagService,
     *,
-    library_tag_id: str,
-    kind: ResourceKind,
+    kind: TagType,
     name: str,
     description: Optional[str],
     content: str,
@@ -132,7 +109,12 @@ def _create_resource(
         labels=labels or [],
     )
     try:
-        return svc.create(library_tag_id=library_tag_id, payload=payload, user=get_system_actor())
+        tag = tag_service.ensure_tag(user=get_system_actor(), tag_type=kind, name=DEFAULT_CATALOG.library_tag)
+        return resource_service.create(library_tag_id=tag.id, payload=payload, user=get_system_actor())
+    except ResourceAlreadyExistsError:
+        # Expected case: the resource already exists, so we just skip it.
+        # No warning needed, as this is part of the normal idempotent behavior.
+        return None
     except Exception:
         logger.warning("[BOOTSTRAP] Create failed for %s (%s)", name, kind, exc_info=True)
         return None
@@ -146,23 +128,20 @@ def bootstrap_fred_core() -> dict:
     Idempotently seed the fred-core library with catalog items and agent bindings.
     Returns a small summary dict for logs / UI.
     """
-    svc = ResourceService()
-
-    # 1) Ensure the library tag exists
-
+    resource_service = ResourceService()
+    tag_service = TagService()
+    # 1) Ensure the library tag exists. For each of the Kind defined in
+    # fred_core we must have a tag with name DEFAULT8CATALOG.library_tag
+    # so we simply loop over the kinds and create the tag if it does not exist.
+    # kinds are defined like this in fred_core: Kind = Literal["prompt", "template", "policy", "tool_instruction"]
     created = []
     skipped = []
-
     # 2) Seed items (prompts/templates/policies/tool-instructions)
     for item in DEFAULT_CATALOG.items:
-        kind = ResourceKind(item.kind)
-        if _exists_by_name_in_library(svc, kind=kind, library_tag_id=DEFAULT_CATALOG.library_tag, resource_id=item.name):
-            skipped.append(item.name)
-            continue
-
+        kind = TagType(item.kind)
         res = _create_resource(
-            svc,
-            library_tag_id=DEFAULT_CATALOG.library_tag,
+            resource_service,
+            tag_service,
             kind=kind,
             name=item.name,
             description=item.description,
@@ -173,17 +152,13 @@ def bootstrap_fred_core() -> dict:
 
     # 3) Seed agent bindings as AGENT_BINDING resources
     for binding in DEFAULT_CATALOG.agents:
-        kind = ResourceKind.AGENT_BINDING  # ← explicit new kind
-        if _exists_by_name_in_library(svc, kind=kind, library_tag_id=DEFAULT_CATALOG.library_tag, resource_id=binding.name):
-            skipped.append(f"agent:{binding.name}")
-            continue
-
+        kind = TagType.AGENT_BINDING  # ← explicit new kind
         res = _create_resource(
-            svc,
-            library_tag_id=DEFAULT_CATALOG.library_tag,
+            resource_service,
+            tag_service,
             kind=kind,
             name=binding.name,
-            description=f"Default fred-core bindings for {binding.display_name}",
+            description=f"Default fred-core bindings for {binding.name}",
             content=_yaml_from_agent_binding(binding),
             labels=[f"agent:{binding.name}", "binding:default"],
         )

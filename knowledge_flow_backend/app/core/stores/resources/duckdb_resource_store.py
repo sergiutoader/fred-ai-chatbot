@@ -6,14 +6,13 @@ from typing import List
 
 from pydantic import ValidationError
 
-from fred_core.store.duckdb_store import DuckDBTableStore
+from fred_core import TagType, DuckDBTableStore
 from app.core.stores.resources.base_resource_store import (
     BaseResourceStore,
     ResourceAlreadyExistsError,
     ResourceNotFoundError,
 )
-from app.features.resources.structures import Resource, ResourceKind
-
+from app.features.resources.structures import Resource
 
 class DuckdbResourceStore(BaseResourceStore):
     def __init__(self, db_path: Path):
@@ -83,7 +82,7 @@ class DuckdbResourceStore(BaseResourceStore):
         try:
             return Resource(
                 id=row[0],
-                kind=ResourceKind(row[1]),
+                kind=TagType(row[1]),
                 version=row[2],
                 name=row[3],
                 description=row[4],
@@ -99,7 +98,7 @@ class DuckdbResourceStore(BaseResourceStore):
 
     # --- CRUD ---
 
-    def list_resources_for_user(self, user: str, kind: ResourceKind) -> List[Resource]:
+    def list_resources_for_user(self, user: str, kind: TagType) -> List[Resource]:
         with self.store._connect() as conn:
             rows = conn.execute(
                 f"SELECT * FROM {self._table()} WHERE author = ? AND kind = ?",
@@ -107,7 +106,7 @@ class DuckdbResourceStore(BaseResourceStore):
             ).fetchall()
         return [self._deserialize(r) for r in rows]
 
-    def get_all_resources(self, kind: ResourceKind) -> List[Resource]:
+    def get_all_resources(self, kind: TagType) -> List[Resource]:
         with self.store._connect() as conn:
             rows = conn.execute(
                 f"SELECT * FROM {self._table()} WHERE kind = ?",
@@ -140,9 +139,9 @@ class DuckdbResourceStore(BaseResourceStore):
             )
         return resource
 
-    def update_resource(self, resource_id: str, resource: Resource) -> Resource:
+    def update_resource(self, id: str, resource: Resource) -> Resource:
         # ensure exists
-        self.get_resource_by_id(resource_id)
+        self.get_resource_by_id(id)
 
         with self.store._connect() as conn:
             conn.execute(
@@ -172,19 +171,19 @@ class DuckdbResourceStore(BaseResourceStore):
                     resource.updated_at,
                     resource.content,
                     (resource.library_tags or []),
-                    resource_id,
+                    id,
                 ),
             )
         return resource
 
-    def delete_resource(self, resource_id: str) -> None:
+    def delete_resource(self, id: str) -> None:
         with self.store._connect() as conn:
             result = conn.execute(
                 f"DELETE FROM {self._table()} WHERE id = ?",
-                [resource_id],
+                [id],
             )
         if result.rowcount == 0:
-            raise ResourceNotFoundError(f"No resource with ID {resource_id}")
+            raise ResourceNotFoundError(f"No resource with ID {id}")
 
     def get_resources_in_tag(self, tag_id: str) -> List[Resource]:
         # library_tags is a LIST(VARCHAR), so we can use list_contains
@@ -196,3 +195,37 @@ class DuckdbResourceStore(BaseResourceStore):
         if not rows:
             raise ResourceNotFoundError(f"No resources found for tag {tag_id}")
         return [self._deserialize(r) for r in rows]
+
+    def resource_exists(self, *, name: str, kind: TagType, library_tag_id: str) -> bool:
+        """
+        Checks if a resource with the given name, kind, and library tag ID already exists.
+        """
+        with self.store._connect() as conn:
+            query = f"""
+                SELECT 1 FROM {self._table()}
+                WHERE
+                    name = ? AND
+                    kind = ? AND
+                    list_contains(library_tags, ?)
+                LIMIT 1
+            """
+            result = conn.execute(query, [name, kind.value, library_tag_id]).fetchone()
+            return result is not None
+
+    def search(self, *, name: str, kind: TagType, library_tag_name: str) -> List[Resource]:
+        """
+        Executes a precise search for resources based on name, kind, and library tag name.
+        """
+        with self.store._connect() as conn:
+            query = f"""
+                SELECT * FROM {self._table()}
+                WHERE
+                    name = ? AND
+                    kind = ? AND
+                    list_contains(library_tags, ?)
+            """
+            rows = conn.execute(query, [name, kind.value, library_tag_name]).fetchall()
+        
+        # If no rows are found, return an empty list as expected by the service layer
+        if not rows:
+            return []

@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import {
   useListAllTagsKnowledgeFlowV1TagsGetQuery,
-  ResourceKind,
+  TagType,
   useListResourcesByKindKnowledgeFlowV1ResourcesGetQuery,
   Resource,
   TagWithItemsId,
@@ -41,7 +41,7 @@ import { AgentEditorModal } from "./AgentEditorModal";
 import { McpEditorModal } from "./McpEditorModal";
 
 /** Small i18n helper */
-export const useKindLabels = (kind: "prompt" | "template" | "mcp" | "agent") => {
+export const useKindLabels = (kind: TagType) => {
   const { t } = useTranslation();
   return {
     one: t(`resource.kind.${kind}.one`),
@@ -76,7 +76,7 @@ const resHasAnyTag = (r: Resource, tagIds: string[]) => {
   return ids.some((id) => tagIds.includes(id));
 };
 
-type Props = { kind: ResourceKind };
+type Props = { kind: TagType };
 
 export default function ResourceLibraryList({ kind }: Props) {
   const { t } = useTranslation();
