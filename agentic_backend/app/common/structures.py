@@ -88,7 +88,7 @@ class AgentSettings(BaseModel):
     categories: List[str] = Field(default_factory=list)
     settings: Dict[str, Any] = Field(default_factory=dict)
     model: Optional[ModelConfiguration] = None
-    tag: str # a tag to identify the agent, e.g., "generalist", "tabular", "supervision" it is key to match some agent bindings
+    tag: Optional[str] = None
     mcp_servers: Optional[List[MCPServerConfiguration]] = Field(default_factory=list)
     max_steps: Optional[int] = 10
     description: Optional[str] = None
@@ -116,7 +116,6 @@ class AIConfig(BaseModel):
     recursion: RecursionConfig = Field(
         ..., description="Number of max recursion while using the model"
     )
-
 
 class FrontendFlags(BaseModel):
     enableK8Features: bool = False
