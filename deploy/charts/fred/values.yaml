@@ -475,19 +475,19 @@ applications:
           workflow_prefix: "pipeline"
           connect_timeout_seconds: 5
       input_processors:
-        - prefix: ".pdf"
+        - prefixes: [".pdf"]
           class_path: app.core.processors.input.pdf_markdown_processor.openai_pdf_markdown_processor.OpenaiPdfMarkdownProcessor
-        - prefix: ".docx"
+        - prefixes: [".docx"]
           class_path: app.core.processors.input.docx_markdown_processor.docx_markdown_processor.DocxMarkdownProcessor
-        - prefix: ".pptx"
+        - prefixes: [".pptx", ".ppt"]
           class_path: app.core.processors.input.pptx_markdown_processor.pptx_markdown_processor.PptxMarkdownProcessor
-        - prefix: ".csv"
+        - prefixes: [".csv"]
           class_path: app.core.processors.input.csv_tabular_processor.csv_tabular_processor.CsvTabularProcessor
-        - prefix: ".txt"
+        - prefixes: [".txt"]
           class_path: app.core.processors.input.text_markdown_processor.text_markdown_processor.TextMarkdownProcessor
-        - prefix: ".md"
+        - prefixes: [".md"]
           class_path: app.core.processors.input.markdown_markdown_processor.markdown_markdown_processor.MarkdownMarkdownProcessor
-        - prefix: ".xlsm"
+        - prefixes: [".xlsm"]
           class_path: app.core.processors.input.pps_tabular_processor.pps_tabular_processor.PpsTabularProcessor
       content_storage:
         type: local

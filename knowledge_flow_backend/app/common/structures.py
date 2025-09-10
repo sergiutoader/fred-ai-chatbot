@@ -61,11 +61,11 @@ class ProcessorConfig(BaseModel):
     """
     Configuration structure for a file processor.
     Attributes:
-        prefix (str): The file extension this processor handles (e.g., '.pdf').
+        prefixes (List[str]): The file extensions this processor handles (e.g., ['.pdf', '.doc']).
         class_path (str): Dotted import path of the processor class.
     """
 
-    prefix: str = Field(..., description="The file extension this processor handles (e.g., '.pdf')")
+    prefixes: List[str] = Field(..., description="The file extensions this processor handles (e.g., ['.pdf', '.doc'])")
     class_path: str = Field(..., description="Dotted import path of the processor class")
 
 

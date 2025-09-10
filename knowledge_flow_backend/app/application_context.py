@@ -152,7 +152,7 @@ def validate_input_processor_config(config: Configuration):
             cls = getattr(module, class_name)
             if not issubclass(cls, BaseInputProcessor):
                 raise TypeError(f"{entry.class_path} is not a subclass of BaseProcessor")
-            logger.debug(f"Validated input processor: {entry.class_path} for prefix: {entry.prefix}")
+            logger.debug(f"Validated input processor: {entry.class_path} for prefixes: {entry.prefixes}")
         except (ImportError, AttributeError, TypeError) as e:
             raise ImportError(f"Input Processor '{entry.class_path}' could not be loaded: {e}")
 
@@ -168,7 +168,7 @@ def validate_output_processor_config(config: Configuration):
             cls = getattr(module, class_name)
             if not issubclass(cls, BaseOutputProcessor):
                 raise TypeError(f"{entry.class_path} is not a subclass of BaseProcessor")
-            logger.debug(f"Validated output processor: {entry.class_path} for prefix: {entry.prefix}")
+            logger.debug(f"Validated output processor: {entry.class_path} for prefixes: {entry.prefixes}")
         except (ImportError, AttributeError, TypeError) as e:
             raise ImportError(f"Output Processor '{entry.class_path}' could not be loaded: {e}")
 
@@ -286,8 +286,9 @@ class ApplicationContext:
             cls = self._dynamic_import(entry.class_path)
             if not issubclass(cls, BaseInputProcessor):
                 raise TypeError(f"{entry.class_path} is not a subclass of BaseProcessor")
-            logger.debug(f"Loaded input processor: {entry.class_path} for prefix: {entry.prefix}")
-            registry[entry.prefix.lower()] = cls
+            logger.debug(f"Loaded input processor: {entry.class_path} for prefixes: {entry.prefixes}")
+            for prefix in entry.prefixes:
+                registry[prefix.lower()] = cls
         return registry
 
     def _load_output_processor_registry(self) -> Dict[str, Type[BaseOutputProcessor]]:
@@ -298,8 +299,9 @@ class ApplicationContext:
             cls = self._dynamic_import(entry.class_path)
             if not issubclass(cls, BaseOutputProcessor):
                 raise TypeError(f"{entry.class_path} is not a subclass of BaseOutputProcessor")
-            logger.debug(f"Loaded output processor: {entry.class_path} for prefix: {entry.prefix}")
-            registry[entry.prefix.lower()] = cls
+            logger.debug(f"Loaded output processor: {entry.class_path} for prefixes: {entry.prefixes}")
+            for prefix in entry.prefixes:
+                registry[prefix.lower()] = cls
         return registry
 
     def get_config(self) -> Configuration:
