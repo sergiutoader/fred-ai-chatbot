@@ -1,4 +1,3 @@
-
 app:
   name: "Knowledge Flow Backend"
   base_url: "/knowledge-flow/v1"
@@ -19,6 +18,10 @@ security:
     realm_url: "http://app-keycloak:8080/realms/app"
     authorized_origins:
       - "http://localhost:5173"
+  rebac:
+    type: spicedb
+    endpoint: "http://localhost:50051"
+    insecure: true
 
 scheduler:
   enabled: true
@@ -51,7 +54,6 @@ input_processors:
     class_path: app.core.processors.input.markdown_markdown_processor.markdown_markdown_processor.MarkdownMarkdownProcessor
   - prefix: ".xlsm"
     class_path: app.core.processors.input.pps_tabular_processor.pps_tabular_processor.PpsTabularProcessor
-
 
 # -----------------------------------------------------------------------------
 # OUTPUT PROCESSORS (Optional)
@@ -101,7 +103,6 @@ content_storage:
   # secret_key: minioadmin # Overrides the MINIO_SECRET_KEY environment variable
   # secure: False
   # bucket_name: app-bucket
-
 
 metadata_storage:
   # Metadata Storage Configuration

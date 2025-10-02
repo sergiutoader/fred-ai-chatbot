@@ -18,7 +18,7 @@ app:
   log_level: "info"
   reload: false
   reload_dir: "."
-  
+
 security:
   m2m:
     enabled: true
@@ -30,6 +30,10 @@ security:
     realm_url: "http://app-keycloak:8080/realms/app"
     authorized_origins:
       - "http://localhost:5173"
+  rebac:
+    type: spicedb
+    endpoint: "http://localhost:50051"
+    insecure: true
 
 frontend_settings:
   feature_flags:
@@ -81,7 +85,7 @@ ai:
       tags: ["orchestrator"]
       crew:
         - "Georges"
-        - "Rico Jr." 
+        - "Rico Jr."
         - "Tessa"
       description: >
         An orchestrator agent that can delegate tasks to specialized agents in its crew.
@@ -173,7 +177,7 @@ ai:
           sse_read_timeout: 2000
     - name: "Scribo"
       type: "agent"
-      role: "Structured Report Generator"  
+      role: "Structured Report Generator"
       description: >
         Produces concise project status reports with Summary, Risks, and Next Steps.
         Can optionally include CIR (Crédit d’Impôt Recherche) sections for R&D reporting.
@@ -184,9 +188,8 @@ ai:
       mcp_servers:
         - name: knowledge-flow-mcp-server
           transport: streamable_http
-          url: http://localhost:8111/knowledge-flow/v1/mcp-reports 
-          sse_read_timeout: 2000   
-
+          url: http://localhost:8111/knowledge-flow/v1/mcp-reports
+          sse_read_timeout: 2000
 
 storage:
   postgres:

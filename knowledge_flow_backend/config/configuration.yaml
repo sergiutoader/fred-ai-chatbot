@@ -35,6 +35,10 @@ security:
     realm_url: "http://app-keycloak:8080/realms/app"
     authorized_origins:
       - "http://localhost:5173"
+  rebac:
+    type: spicedb
+    endpoint: "http://localhost:50051"
+    insecure: true
 
 scheduler:
   enabled: true
@@ -87,8 +91,8 @@ embedding:
 # Configuration for the LLM used for summary, keyword generation
 # and other text generation tasks.
 model:
-  provider: openai        # openai | azure | ollama
-  name: gpt-4o-mini       # azure: deployment name, ollama: 'qwen2.5:3b-instruct' etc.
+  provider: openai # openai | azure | ollama
+  name: gpt-4o-mini # azure: deployment name, ollama: 'qwen2.5:3b-instruct' etc.
   settings:
     # openai: nothing else required (keys in .env)
     # azure: { endpoint: "...", api_version: "2024-08-01-preview" }
