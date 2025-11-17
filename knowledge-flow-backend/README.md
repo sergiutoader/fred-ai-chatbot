@@ -47,7 +47,7 @@ to use another setup.
 git clone https://github.com/ThalesGroup/knowledge-flow.git
 cd knowledge-flow
 make dev
-cp config/.env.template config/.env
+cp config/.env config/.env
 # Edit .env to add OPENAI_API_KEY
 make run
 ```

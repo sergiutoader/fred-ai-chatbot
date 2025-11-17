@@ -123,21 +123,21 @@ declare module "@mui/material/Typography" {
 }
 
 // ---------- Shared Gradient Stops (single source of truth) ----------
-const lightHeroFrom = "#ffffffff";
-const lightHeroTo = "#ffffffff";
+const lightHeroFrom = "#1E88E5";
+const lightHeroTo = "#1565C0";
 
-const darkHeroFrom = "#191923ff";
-const darkHeroTo = "#191923ff";
+const darkHeroFrom = "#1565C0";
+const darkHeroTo = "#0D47A1";
 
 // ---------- Light Palette ----------
 const lightPalette = {
   mode: "light" as PaletteMode,
   background: {
-    default: "#ffffff",
-    paper: "#f4f4f4",
+    default: "#1E88E5",
+    paper: "#1976D2",
   },
   common: { white: "#fff", black: "#000" },
-  primary: { contrastText: "#fff", main: "#4F83CC", light: "#879ed9", dark: "#023D54" },
+  primary: { contrastText: "#fff", main: "#42A5F5", light: "#64B5F6", dark: "#1565C0" },
   secondary: { main: "#9c27b0", light: "#ba68c8", dark: "#7b1fa2", contrastText: "#fff" },
   info: { main: "#6986D0", light: "#879ed9", dark: "#495d91", contrastText: "#fff" },
   warning: { main: "#ffbb00", light: "#ffd149", dark: "#ffc833", contrastText: "#fff" },
@@ -171,15 +171,15 @@ const lightPalette = {
     alterningBgColor1: "#ffffff1a",
     alterningBgColor2: "#c8c8c84d",
   },
-  text: { primary: "#000", secondary: "#000", disabled: "#BDBDBD" },
+  text: { primary: "#fff", secondary: "#E3F2FD", disabled: "#90CAF9" },
   chip: { mediumGrey: "#dedfe0" },
-  sidebar: { background: "#fafafaf2", activeItem: "#f0f0f5cc", hoverColor: "#00000008" },
-  borderChip: { border: "#0000004d" },
+  sidebar: { background: "#1565C0f2", activeItem: "#1976D2cc", hoverColor: "#ffffff1a" },
+  borderChip: { border: "#ffffff4d" },
   heroBackgroundGrad: { gradientFrom: lightHeroFrom, gradientTo: lightHeroTo },
   // Surfaces derived from hero gradient to keep consistency with the welcome box
   surfaces: {
     soft: `linear-gradient(180deg, ${lightHeroFrom}, ${lightHeroTo})`,
-    raised: `linear-gradient(180deg, #ffffffcc, #f7f7f7f2)`,
+    raised: `linear-gradient(180deg, #1976D2cc, #1565C0f2)`,
   },
 };
 
@@ -187,11 +187,11 @@ const lightPalette = {
 const darkPalette = {
   mode: "dark" as PaletteMode,
   background: {
-    default: "#1b1b1b",
-    paper: "#333333",
+    default: "#0D47A1",
+    paper: "#1565C0",
   },
   common: { white: "#fff", black: "#000" },
-  primary: { contrastText: "#fff", main: "#6482AD", light: "#879ed9", dark: "#404040" },
+  primary: { contrastText: "#fff", main: "#42A5F5", light: "#64B5F6", dark: "#1976D2" },
   secondary: { main: "#f48fb1", light: "#f8bbd0", dark: "#c2185b", contrastText: "#000" },
   info: { main: "#81d4fa", light: "#b3e5fc", dark: "#0288d1", contrastText: "#fff" },
   warning: { main: "#ffcc80", light: "#ffe0b2", dark: "#f57c00", contrastText: "#fff" },
@@ -226,13 +226,13 @@ const darkPalette = {
     alterningBgColor2: "#c8c8c84d",
   },
   text: { primary: "#fff", secondary: "#bbb", disabled: "#888888" },
-  sidebar: { background: "#121214f2", activeItem: "#42424db3", hoverColor: "#ffffff0d" },
+  sidebar: { background: "#0D47A1f2", activeItem: "#1565C0b3", hoverColor: "#ffffff1a" },
   borderChip: { border: "#ffffff26" },
   heroBackgroundGrad: { gradientFrom: darkHeroFrom, gradientTo: darkHeroTo },
   // Surfaces derived from hero gradient (the subtle blue you liked)
   surfaces: {
     soft: `linear-gradient(180deg, ${darkHeroFrom}, ${darkHeroTo})`,
-    raised: `linear-gradient(180deg, #1f2230cc, #1b1f2ae6)`,
+    raised: `linear-gradient(180deg, #1565C0cc, #0D47A1e6)`,
   },
 };
 
@@ -265,11 +265,11 @@ const baseTypography = {
 
 const lightTypography = {
   ...baseTypography,
-  sidebar: { ...baseTypography.sidebar, color: lightPalette.text.secondary },
+  sidebar: { ...baseTypography.sidebar, color: "#E3F2FD" },
   markdown: Object.fromEntries(
     Object.entries(baseTypography.markdown).map(([k, v]) => [
       k,
-      { ...v, color: lightPalette.text.primary, fontFamily: "Inter, sans-serif" },
+      { ...v, color: "#fff", fontFamily: "Inter, sans-serif" },
     ]),
   ),
 };
@@ -338,7 +338,7 @@ const lightTheme = createTheme({
     },
     MuiTypography: {
       styleOverrides: {
-        root: { color: lightPalette.text.primary },
+        root: { color: "#fff" },
       },
       variants: [
         {
@@ -348,7 +348,7 @@ const lightTheme = createTheme({
             fontWeight: 300,
             lineHeight: 1.5,
             fontFamily: "Inter, sans-serif",
-            color: lightPalette.text.secondary,
+            color: "#E3F2FD",
           },
         },
       ],

@@ -41,7 +41,6 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getProperty } from "../common/config.tsx";
 import { usePermissions } from "../security/usePermissions";
-import { ImageComponent } from "../utils/image.tsx";
 import { ApplicationContext } from "./ApplicationContextProvider.tsx";
 
 type MenuItemCfg = {
@@ -188,7 +187,7 @@ export default function SideBar({ darkMode, onThemeChange }) {
     });
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const logoName = getProperty("logoName") || "fred";
+  const logoName = getProperty("logoName") || "smurf-logo";
 
   return (
     <Box
@@ -217,7 +216,7 @@ export default function SideBar({ darkMode, onThemeChange }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          height: 62,
+          height: "auto",
           py: 0.0,
           px: isSidebarSmall ? 1 : 2,
           borderBottom: `1px solid ${theme.palette.divider}`,
@@ -229,17 +228,18 @@ export default function SideBar({ darkMode, onThemeChange }) {
             alignItems: "center",
             cursor: "pointer",
             justifyContent: "center",
+            height: "auto",
           }}
           onClick={() => navigate("/")}
         >
           <Avatar
             sx={{
-              width: 42,
-              height: 42,
+              width: 120,
+              height: 120,
               backgroundColor: "transparent",
             }}
           >
-            <ImageComponent name={logoName} width="36px" height="36px" />
+            <img src={`/images/${logoName}.png`} alt="Logo" style={{ width: "100px", height: "100px", objectFit: "contain" }} />
           </Avatar>
         </Box>
       </Box>
@@ -253,6 +253,7 @@ export default function SideBar({ darkMode, onThemeChange }) {
             border: `1px solid ${theme.palette.divider}`,
             width: 28,
             height: 28,
+            color: "#fff",
             "&:hover": { backgroundColor: hoverColor },
           }}
         >
@@ -286,10 +287,10 @@ export default function SideBar({ darkMode, onThemeChange }) {
                     height: 44,
                     justifyContent: "center",
                     backgroundColor: active ? activeItemBgColor : "transparent",
-                    color: active ? activeItemTextColor : "text.secondary",
+                    color: active ? activeItemTextColor : "#fff",
                     "&:hover": {
                       backgroundColor: active ? activeItemBgColor : hoverColor,
-                      color: active ? activeItemTextColor : "text.primary",
+                      color: active ? activeItemTextColor : "#fff",
                     },
                     transition: "all 0.2s",
                     px: 1,
@@ -322,10 +323,10 @@ export default function SideBar({ darkMode, onThemeChange }) {
                     height: 44,
                     justifyContent: "flex-start",
                     backgroundColor: active ? activeItemBgColor : "transparent",
-                    color: active ? activeItemTextColor : "text.secondary",
+                    color: active ? activeItemTextColor : "#fff",
                     "&:hover": {
                       backgroundColor: active ? activeItemBgColor : hoverColor,
-                      color: active ? activeItemTextColor : "text.primary",
+                      color: active ? activeItemTextColor : "#fff",
                     },
                     transition: "all 0.2s",
                     px: 2,
@@ -373,10 +374,10 @@ export default function SideBar({ darkMode, onThemeChange }) {
                               mb: 0.0,
                               height: 32,
                               backgroundColor: childActive ? activeItemBgColor : "transparent",
-                              color: childActive ? activeItemTextColor : "text.secondary",
+                              color: childActive ? activeItemTextColor : "#fff",
                               "&:hover": {
                                 backgroundColor: childActive ? activeItemBgColor : hoverColor,
-                                color: childActive ? activeItemTextColor : "text.primary",
+                                color: childActive ? activeItemTextColor : "#fff",
                               },
                               transition: "all 0.2s",
                               px: 1,
@@ -421,15 +422,15 @@ export default function SideBar({ darkMode, onThemeChange }) {
           }}
         >
           {!isSidebarSmall && (
-            <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+            <Typography variant="caption" color="#fff" sx={{ mr: 1 }}>
               {darkMode ? t("sidebar.theme.dark") : t("sidebar.theme.light")}
             </Typography>
           )}
           <IconButton size="small" onClick={onThemeChange} sx={{ p: 1, "&:hover": { backgroundColor: hoverColor } }}>
             {darkMode ? (
-              <LightModeIcon sx={{ fontSize: "1rem", color: "text.secondary" }} />
+              <LightModeIcon sx={{ fontSize: "1rem", color: "#fff" }} />
             ) : (
-              <DarkModeIcon sx={{ fontSize: "1rem", color: "text.secondary" }} />
+              <DarkModeIcon sx={{ fontSize: "1rem", color: "#fff" }} />
             )}
           </IconButton>
         </Box>
@@ -447,7 +448,7 @@ export default function SideBar({ darkMode, onThemeChange }) {
               borderRadius: 1,
             }}
           >
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="#fff">
               Website
             </Typography>
             <IconButton
@@ -456,7 +457,7 @@ export default function SideBar({ darkMode, onThemeChange }) {
               onClick={() => window.open("https://fredk8.dev", "_blank", "noopener,noreferrer")}
               sx={{ p: 0.3 }}
             >
-              <OpenInNewIcon sx={{ fontSize: "0.8rem", color: "text.secondary" }} />
+              <OpenInNewIcon sx={{ fontSize: "0.8rem", color: "#fff" }} />
             </IconButton>
           </Box>
         )}

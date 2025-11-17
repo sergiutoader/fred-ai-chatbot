@@ -226,8 +226,8 @@ No matter which development environment you choose, both backends rely on two pa
 1. **Copy the templates (skip if they already exist).**
 
    ```bash
-   cp agentic_backend/config/.env.template agentic_backend/config/.env
-   cp knowledge_flow_backend/config/.env.template knowledge_flow_backend/config/.env
+   cp agentic_backend/config/.env agentic_backend/config/.env
+   cp knowledge_flow_backend/config/.env knowledge_flow_backend/config/.env
    ```
 
 2. **Edit the `.env` files** to set the API keys, base URLs, and deployment names that match your model provider.

@@ -28,13 +28,13 @@ function FredUi() {
   const [router, setRouter] = useState<any>(null);
   const { data: frontendConfig } = useGetFrontendConfigAgenticV1ConfigFrontendSettingsGetQuery();
   const siteDisplayName = frontendConfig?.frontend_settings?.properties?.siteDisplayName || "Fred";
-  const logoName = frontendConfig?.frontend_settings?.properties?.logoName || "fred";
+  const logoName = frontendConfig?.frontend_settings?.properties?.logoName || "smurf-logo";
 
   useEffect(() => {
     document.title = siteDisplayName;
     const favicon = document.getElementById("favicon") as HTMLLinkElement | null;
     if (favicon) {
-      favicon.href = `/images/${logoName}.svg`;
+      favicon.href = `/images/${logoName}.png`;
     }
   }, [siteDisplayName, logoName]);
 

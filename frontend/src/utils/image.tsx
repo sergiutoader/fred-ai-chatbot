@@ -39,9 +39,18 @@ export const ImageComponent = ({ name, width, height }: ImageProps) => {
     };
 
     img.onerror = () => {
-      console.log("image not found", name);
-      setImageExists(false); // If the image doesn't exist, use fallback
-      setImageSrc(`/images/package-thin-svgrepo-com.svg`);
+      // Try PNG if SVG fails
+      const pngImg = new Image();
+      pngImg.src = `/images/${name}.png`;
+      pngImg.onload = () => {
+        setImageExists(true);
+        setImageSrc(`/images/${name}.png`);
+      };
+      pngImg.onerror = () => {
+        console.log("image not found", name);
+        setImageExists(false); // If the image doesn't exist, use fallback
+        setImageSrc(`/images/package-thin-svgrepo-com.svg`);
+      };
     };
   }, [name]);
   return (

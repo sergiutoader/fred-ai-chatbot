@@ -233,13 +233,14 @@ export default function Chat() {
   };
 
   return (
-    <Box ref={containerRef} sx={{ height: "100vh", position: "relative", overflow: "hidden" }}>
+    <Box ref={containerRef} sx={{ height: "100vh", position: "relative", overflow: "hidden", bgcolor: "#64B5F6" }}>
       {/* Panel toggle buttons */}
       <Box sx={buttonContainerSx}>
         <IconButton
           color={panelContentType === "conversations" ? "primary" : "default"}
           onClick={openConversationsPanel}
           title={t("settings.conversations")}
+          sx={{ color: "#fff" }}
         >
           <ChatIcon />
         </IconButton>

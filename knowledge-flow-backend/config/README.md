@@ -59,7 +59,7 @@ Environment-specific secrets and credentials are **not hardcoded** in these file
 - A sample is provided in `.env.template` — copy it to `.env` and fill in the required values.
 
 ```bash
-cp .env.template .env
+cp .env .env
 ```
 
 You’ll need to provide values for:
