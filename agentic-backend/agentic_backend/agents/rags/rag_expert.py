@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 #   and are applied by AgentFlow at runtime.
 RAG_TUNING = AgentTuning(
     role="Document retrieval and QA expert",
-    description="An expert in retrieving and processing documents using retrieval-augmented generation techniques. Rico can help with tasks that involve understanding and utilizing large document collections.",
+    description="An expert in retrieving and processing documents using retrieval-augmented generation techniques. SmurfIA can help with tasks that involve understanding and utilizing large document collections.",
     tags=["document"],
     fields=[
         FieldSpec(

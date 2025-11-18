@@ -45,7 +45,7 @@ frontend_settings:
     enableElecWarfare: false
   properties:
     logoName: "fred"
-    siteDisplayName: "Fred"
+    siteDisplayName: "SmurfIA"
 
 ai:
   # In production  activate the configuration persistence mechanism
